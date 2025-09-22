@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-st3u00ftsi_p6%k_)56+u((n29u%wm91)-9kr5i-y0gu6nm@!v
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -76,12 +76,15 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'bank_data',
         'USER': 'root',
-        'PASSWORD': 'chanchal@123',
-        'HOST': 'localhost',
-        'PORT': '3306',
+        'PASSWORD': 'gh2SzrjSk54PMCoSWHPTyVX1GUwSAqLN',
+        'HOST': 'dpg-d3402t3uibrs73avr620-a.oregon-postgres.render.com',
+        'PORT': '5432',
+        'OPTIONS': {
+            'sslmode': 'require',
+        },
     }
 }
 
