@@ -33,7 +33,8 @@ ALLOWED_HOSTS = [
 
 # ✅ Allow CORS (better than using "*")
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Your frontend dev server
+    "http://localhost:5173", 
+    "https://good-debt-in-react-vite-main.vercel.app", # Your frontend dev server
     "https://bank-project-1-x3bi.onrender.com",  # Render domain
 ]
 
