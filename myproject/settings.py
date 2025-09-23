@@ -24,9 +24,18 @@ SECRET_KEY = 'django-insecure-st3u00ftsi_p6%k_)56+u((n29u%wm91)-9kr5i-y0gu6nm@!v
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+# ✅ Add your Render domain here
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "bank-project-1-x3bi.onrender.com",  # Render domain
+]
 
-# ALLOWED_HOSTS = ["*"]
-CORS_ALLOWED_ALL_ORIGINS = True
+# ✅ Allow CORS (better than using "*")
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Your frontend dev server
+    "https://bank-project-1-x3bi.onrender.com",  # Render domain
+]
 
 
 # Application definition
