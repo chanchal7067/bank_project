@@ -1,6 +1,26 @@
 from rest_framework import serializers
 from .models import Customer, Bank , LoanRule, CustomerInterest
 
+
+class AdminLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+    # Hardcoded credentials
+    ADMIN_EMAIL = "admin@example.com"
+    ADMIN_PASSWORD = "admin123"
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        password = attrs.get("password")
+
+        if email != self.ADMIN_EMAIL or password != self.ADMIN_PASSWORD:
+            raise serializers.ValidationError("Invalid admin credentials")
+
+        return attrs
+
+
+
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
@@ -33,9 +53,14 @@ class CustomerSerializer(serializers.ModelSerializer):
             return Customer.objects.create(**validated_data)
         
 class BankSerializer(serializers.ModelSerializer):
+    bank_image_url = serializers.SerializerMethodField()
     class Meta:
         model = Bank
         fields = '__all__'
+    def get_bank_image_url(self, obj):
+        if obj.bank_image:
+            return obj.bank_image.url  
+        return None
 
 class LoanRuleSerializer(serializers.ModelSerializer):
     class Meta:

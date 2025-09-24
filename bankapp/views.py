@@ -3,7 +3,14 @@ from rest_framework.response import Response
 from rest_framework import status
 from datetime import date
 from .models import Customer, Bank, LoanRule, CustomerInterest
-from .serializers import CustomerSerializer, BankSerializer, LoanRuleSerializer, CustomerInterestSerializer
+from .serializers import CustomerSerializer, BankSerializer, LoanRuleSerializer, CustomerInterestSerializer , AdminLoginSerializer
+
+@api_view(["POST"])
+def admin_login(request):
+    serializer = AdminLoginSerializer(data=request.data)
+    if serializer.is_valid():
+        return Response({"message": "Admin login successful"}, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["POST"])
 def customer_create_or_eligible_banks(request):
@@ -77,26 +84,68 @@ def customer_create_or_eligible_banks(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['GET', 'POST'])
-def bank_list(request):
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+def bank_list(request, pk=None):
+    # GET all banks
     if request.method == 'GET':
-        banks = Bank.objects.all()
-        serializer = BankSerializer(banks, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
+        if pk:  # Get single bank
+            try:
+                bank = Bank.objects.get(pk=pk)
+                serializer = BankSerializer(bank)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            except Bank.DoesNotExist:
+                return Response({"error": "Bank not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:  # Get all banks
+            banks = Bank.objects.all()
+            serializer = BankSerializer(banks, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # CREATE a new bank
     elif request.method == 'POST':
         serializer = BankSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # UPDATE an existing bank
+    elif request.method == 'PUT':
+        if not pk:
+            return Response({"error": "Bank ID required for update"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            bank = Bank.objects.get(pk=pk)
+        except Bank.DoesNotExist:
+            return Response({"error": "Bank not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = BankSerializer(bank, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # DELETE a bank
+    elif request.method == 'DELETE':
+        if not pk:
+            return Response({"error": "Bank ID required for delete"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            bank = Bank.objects.get(pk=pk)
+            bank.delete()
+            return Response({"message": "Bank deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+        except Bank.DoesNotExist:
+            return Response({"error": "Bank not found"}, status=status.HTTP_404_NOT_FOUND)
     
 # get bank details by pincode
 @api_view(['GET'])
-def banks_by_pincode(request,pincode):
+def banks_by_pincode(request, pincode):
     banks = Bank.objects.filter(pincode=pincode)
+    if not banks.exists():
+        return Response(
+            {"message": f"No banks found for pincode {pincode}"},
+            status=status.HTTP_404_NOT_FOUND
+        )
     serializer = BankSerializer(banks, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 # Get all loan rules OR create a new one
 @api_view(['GET','POST'])

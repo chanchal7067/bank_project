@@ -1,4 +1,6 @@
 from django.db import models
+from cloudinary.models import CloudinaryField
+
 
 class Customer(models.Model):
     full_name = models.CharField(max_length=100)
@@ -25,7 +27,8 @@ class Bank(models.Model):
     bank_name = models.CharField(max_length=100)
     state = models.CharField(max_length=50, null=True, blank=True)
     pincode = models.CharField(max_length=10, null=True, blank=True)
-
+    bank_image = CloudinaryField("image", null=True, blank=True)  
+    
     def __str__(self):
         return self.bank_name
 

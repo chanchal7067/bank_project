@@ -2,9 +2,12 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("admin/login/", views.admin_login, name="admin_login"),  
+
     path("customer/create-or-eligible/", views.customer_create_or_eligible_banks, name="customer_create_or_eligible_banks"),
 
-    path("banks/", views.bank_list, name="bank-list"),
+    path("banks/", views.bank_list, name="bank_list"),              # GET all, POST
+    path("banks/<int:pk>/", views.bank_list, name="bank_detail"),  # GET one, PUT, DELETE
     path("banks/pincode/<str:pincode>/", views.banks_by_pincode, name="banks-by-pincode"),
 
     path("loanrules/", views.loanrule_list, name="loanrule-list"),

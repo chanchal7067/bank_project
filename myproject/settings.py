@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+import cloudinary
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,6 +40,15 @@ CORS_ALLOWED_ORIGINS = [
     "https://bank-project-1-x3bi.onrender.com",  # Render domain
 ]
 
+cloudinary.config( 
+  cloud_name = "dnicy6okt",
+  api_key = "322616978983831",
+  api_secret = "RJ5d6IGMfWBBFBXeFrq5WD-aEl4",
+  secure = True
+)
+
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+
 
 # Application definition
 
@@ -51,6 +62,8 @@ INSTALLED_APPS = [
     'bankapp',          # your app
     'rest_framework',
     'corsheaders',
+    "cloudinary",
+    "cloudinary_storage",
 ]
 
 MIDDLEWARE = [
