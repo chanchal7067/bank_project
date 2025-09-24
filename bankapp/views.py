@@ -151,10 +151,13 @@ def banks_by_pincode(request, pincode):
 @api_view(['GET','POST'])
 def loanrule_list(request):
     if request.method == 'GET':
-        loanrules = LoanRule.objects.all()
+        bank_id = request.GET.get('bank_id')  # get bank_id from query param
+        if bank_id:
+            loanrules = LoanRule.objects.filter(bank_id=bank_id)
+        else:
+            loanrules = LoanRule.objects.all()
         serializer = LoanRuleSerializer(loanrules, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
     elif request.method == 'POST':
         serializer = LoanRuleSerializer(data=request.data)
         if serializer.is_valid():
