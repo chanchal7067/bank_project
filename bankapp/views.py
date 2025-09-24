@@ -195,4 +195,4 @@ def customer_interest_list_create(request):
 def customer_interests_by_customer(request, customer_id):
     interests = CustomerInterest.objects.filter(customer_id=customer_id)
     serializer = CustomerInterestSerializer(interests, many=True)
-    return Response(serializer.data)    
+    return Response(serializer.data) 
