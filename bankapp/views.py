@@ -193,7 +193,7 @@ def loanrule_list(request):
         try:
             loanrule = LoanRule.objects.get(pk=loanrule_id)
             loanrule.delete()
-            return Response({"message": "Loan rule deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+            return Response({"message": "Loan rule deleted successfully"}, status=status.HTTP_200_OK)
         except LoanRule.DoesNotExist:
             return Response({"error": "Loan rule not found"}, status=status.HTTP_404_NOT_FOUND)
     
