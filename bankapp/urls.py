@@ -11,6 +11,7 @@ urlpatterns = [
     path("banks/pincode/<str:pincode>/", views.banks_by_pincode, name="banks-by-pincode"),
 
     path("loanrules/", views.loanrule_list, name="loanrule-list"),
+    path("loanrules/<int:pk>/", views.loanrule_list, name="loanrule-detail"),
     path("loanrules/bank/<int:bank_id>/", views.loanrules_by_bank, name="loanrules-by-bank"),
 
     path("customer-interests/", views.customer_interest_list_create, name="customer-interest-list-create"),

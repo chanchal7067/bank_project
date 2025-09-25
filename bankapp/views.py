@@ -148,55 +148,72 @@ def banks_by_pincode(request, pincode):
 
 
 # Get all loan rules OR create a new one
-@api_view(['GET','POST','PUT','DELETE'])
-def loanrule_list(request):
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+def loanrule_list(request, pk=None):
+    # -------------------- GET --------------------
     if request.method == 'GET':
-        bank_id = request.GET.get('bank_id')  # get bank_id from query param
+        if pk:  # get single loan rule
+            try:
+                loanrule = LoanRule.objects.get(pk=pk)
+            except LoanRule.DoesNotExist:
+                return Response({"error": "Loan rule not found"}, status=status.HTTP_404_NOT_FOUND)
+            serializer = LoanRuleSerializer(loanrule)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # get list (optionally filter by bank_id)
+        bank_id = request.GET.get('bank_id')
         if bank_id:
             loanrules = LoanRule.objects.filter(bank_id=bank_id)
         else:
             loanrules = LoanRule.objects.all()
         serializer = LoanRuleSerializer(loanrules, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    elif request.method == 'POST': # Create a new loan rule
+
+    # -------------------- POST --------------------
+    elif request.method == 'POST':
         bank_id = request.data.get("bank")
         job_type = request.data.get("job_type")
 
-    # Check duplicate loan rule for same bank & job type
+        # Prevent duplicate for same bank + job_type
         if LoanRule.objects.filter(bank_id=bank_id, job_type__iexact=job_type).exists():
             return Response(
                 {"error": f"A loan rule already exists for this bank (ID {bank_id}) with job type '{job_type}'"},
-                    status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST
             )
+
         serializer = LoanRuleSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+    # -------------------- PUT --------------------
     elif request.method == 'PUT':
-        loanrule_id = request.data.get("id")
+        if not pk:
+            return Response({"error": "Loan rule ID required in URL"}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            loanrule = LoanRule.objects.get(pk=loanrule_id)
+            loanrule = LoanRule.objects.get(pk=pk)
         except LoanRule.DoesNotExist:
             return Response({"error": "Loan rule not found"}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = LoanRuleSerializer(loanrule, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status= status.HTTP_200_OK)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    # -------------------- DELETE --------------------
     elif request.method == 'DELETE':
-        loanrule_id = request.data.get("id")
+        if not pk:
+            return Response({"error": "Loan rule ID required in URL"}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            loanrule = LoanRule.objects.get(pk=loanrule_id)
+            loanrule = LoanRule.objects.get(pk=pk)
             loanrule.delete()
-            return Response({"message": "Loan rule deleted successfully"}, status=status.HTTP_200_OK)
+            return Response({"message": "Loan rule deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
         except LoanRule.DoesNotExist:
             return Response({"error": "Loan rule not found"}, status=status.HTTP_404_NOT_FOUND)
-    
 
 # Get all loan rules for a specific bank
 @api_view(['GET'])
