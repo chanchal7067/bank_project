@@ -147,12 +147,11 @@ def banks_by_pincode(request, pincode):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-# Get all loan rules OR create a new one
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
 def loanrule_list(request, pk=None):
     # -------------------- GET --------------------
     if request.method == 'GET':
-        if pk:  # get single loan rule
+        if pk:  # Get single loan rule
             try:
                 loanrule = LoanRule.objects.get(pk=pk)
             except LoanRule.DoesNotExist:
@@ -160,7 +159,7 @@ def loanrule_list(request, pk=None):
             serializer = LoanRuleSerializer(loanrule)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        # get list (optionally filter by bank_id)
+        # Get list of loan rules (optionally filter by bank_id)
         bank_id = request.GET.get('bank_id')
         if bank_id:
             loanrules = LoanRule.objects.filter(bank_id=bank_id)
@@ -174,10 +173,10 @@ def loanrule_list(request, pk=None):
         bank_id = request.data.get("bank")
         job_type = request.data.get("job_type")
 
-        # Prevent duplicate for same bank + job_type
+        # Check for duplicate rule for the same bank & job type
         if LoanRule.objects.filter(bank_id=bank_id, job_type__iexact=job_type).exists():
             return Response(
-                {"error": f"A loan rule already exists for this bank (ID {bank_id}) with job type '{job_type}'"},
+                {"error": f"A loan rule already exists for bank ID {bank_id} with job type '{job_type}'"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -211,7 +210,7 @@ def loanrule_list(request, pk=None):
         try:
             loanrule = LoanRule.objects.get(pk=pk)
             loanrule.delete()
-            return Response({"message": "Loan rule deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+            return Response({"message": "Loan rule deleted successfully"}, status=status.HTTP_200_OK)
         except LoanRule.DoesNotExist:
             return Response({"error": "Loan rule not found"}, status=status.HTTP_404_NOT_FOUND)
 

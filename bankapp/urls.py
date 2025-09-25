@@ -10,9 +10,9 @@ urlpatterns = [
     path("banks/<int:pk>/", views.bank_list, name="bank_detail"),  # GET one, PUT, DELETE
     path("banks/pincode/<str:pincode>/", views.banks_by_pincode, name="banks-by-pincode"),
 
-    path("loanrules/", views.loanrule_list, name="loanrule-list"),
-    path("loanrules/<int:pk>/", views.loanrule_list, name="loanrule-detail"),
     path("loanrules/bank/<int:bank_id>/", views.loanrules_by_bank, name="loanrules-by-bank"),
+    path("loanrules/<int:pk>/", views.loanrule_list, name="loanrule-detail"),
+    path("loanrules/", views.loanrule_list, name="loanrule-list"),
 
     path("customer-interests/", views.customer_interest_list_create, name="customer-interest-list-create"),
     path("customer-interests/customer/<int:customer_id>/", views.customer_interests_by_customer, name="customer-interests-by-customer"),
