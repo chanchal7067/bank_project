@@ -159,6 +159,15 @@ def loanrule_list(request):
         serializer = LoanRuleSerializer(loanrules, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
+        bank_id = request.data.get("bank")
+        job_type = request.data.get("job_type")
+
+    # Check duplicate loan rule for same bank & job type
+        if LoanRule.objects.filter(bank_id=bank_id, job_type__iexact=job_type).exists():
+            return Response(
+                {"error": f"A loan rule already exists for this bank (ID {bank_id}) with job type '{job_type}'"},
+                    status=status.HTTP_400_BAD_REQUEST
+            )
         serializer = LoanRuleSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
