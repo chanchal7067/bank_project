@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Customer, Bank , LoanRule, CustomerInterest
+from .models import Customer, Bank , LoanRule, CustomerInterest, Product
 
 
 class AdminLoginSerializer(serializers.Serializer):
@@ -75,3 +75,24 @@ class CustomerInterestSerializer(serializers.ModelSerializer):
         model = CustomerInterest
         fields = ["id", "customer", "customer_name", "bank", "bank_name"]        
         
+class ProductSerializer(serializers.ModelSerializer):
+    # bank_name is read-only, fetched from the related Bank model
+    bank_name = serializers.CharField(source="bank.bank_name", read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            "id",
+            "bank",          # this is bank_id
+            "bank_name",     # comes from related bank
+            "product_title",
+            "min_age",
+            "max_age",
+            "min_tenure",
+            "max_tenure",
+            "min_loan_amount",
+            "max_loan_amount",
+            "min_roi",
+            "max_roi",
+            "foir_details",
+        ]        

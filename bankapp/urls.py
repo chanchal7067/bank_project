@@ -17,4 +17,9 @@ urlpatterns = [
     path("customer-interests/", views.customer_interest_list_create, name="customer-interest-list-create"),
     path("customer-interests/customer/<int:customer_id>/", views.customer_interests_by_customer, name="customer-interests-by-customer"),
 
+    path("products/", views.product_list, name="product-list-create"),
+    path("products/<int:pk>/", views.product_list, name="product-detail"),
+
+    path("products/bank/<int:bank_id>/", views.get_products_by_bank, name="products-by-bank"),
+
 ]

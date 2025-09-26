@@ -54,3 +54,29 @@ class CustomerInterest(models.Model):
 
     def __str__(self):
         return f"{self.customer.full_name} - {self.bank.bank_name}"
+
+class Product(models.Model):
+    bank = models.ForeignKey(Bank, on_delete=models.CASCADE, related_name="products")
+    product_title = models.CharField(max_length=150)
+
+    # Age range
+    min_age = models.IntegerField(null=True, blank=True)
+    max_age = models.IntegerField(null=True, blank=True)
+
+    # Tenure range (in months or years as per your use-case)
+    min_tenure = models.IntegerField(null=True, blank=True)
+    max_tenure = models.IntegerField(null=True, blank=True)
+
+    # Loan amount range
+    min_loan_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    max_loan_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+
+    # ROI range
+    min_roi = models.FloatField(null=True, blank=True)
+    max_roi = models.FloatField(null=True, blank=True)
+
+    # FOIR (string so it can store formatted descriptions like "40% of salary")
+    foir_details = models.CharField(max_length=255, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.bank.bank_name} - {self.product_title}"

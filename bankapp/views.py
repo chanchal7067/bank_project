@@ -2,8 +2,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import date
-from .models import Customer, Bank, LoanRule, CustomerInterest
-from .serializers import CustomerSerializer, BankSerializer, LoanRuleSerializer, CustomerInterestSerializer , AdminLoginSerializer
+from .models import Customer, Bank, LoanRule, CustomerInterest ,Product
+from .serializers import CustomerSerializer, BankSerializer, LoanRuleSerializer, CustomerInterestSerializer , AdminLoginSerializer , ProductSerializer
 
 @api_view(["POST"])
 def admin_login(request):
@@ -247,3 +247,71 @@ def customer_interests_by_customer(request, customer_id):
     interests = CustomerInterest.objects.filter(customer_id=customer_id)
     serializer = CustomerInterestSerializer(interests, many=True)
     return Response(serializer.data) 
+
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+def product_list(request, pk=None):
+    # -------------------- GET --------------------
+    if request.method == 'GET':
+        if pk:  # Get single product
+            try:
+                product = Product.objects.get(pk=pk)
+                serializer = ProductSerializer(product)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            except Product.DoesNotExist:
+                return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:  # Get all products
+            products = Product.objects.all()
+            serializer = ProductSerializer(products, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # -------------------- POST --------------------
+    elif request.method == 'POST':
+        bank_id = request.data.get("bank")
+        product_title = request.data.get("product_title")
+
+        # Check for duplicate product in the same bank
+        if Product.objects.filter(bank_id=bank_id, product_title__iexact=product_title).exists():
+            return Response(
+                {"error": f"A product with title '{product_title}' already exists for bank ID {bank_id}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        serializer = ProductSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # -------------------- PUT --------------------
+    elif request.method == 'PUT':
+        if not pk:
+            return Response({"error": "Product ID required for update"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            product = Product.objects.get(pk=pk)
+        except Product.DoesNotExist:
+            return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ProductSerializer(product, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # -------------------- DELETE --------------------
+    elif request.method == 'DELETE':
+        if not pk:
+            return Response({"error": "Product ID required for delete"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            product = Product.objects.get(pk=pk)
+            product.delete()
+            return Response({"message": "Product deleted successfully"}, status=status.HTTP_200_OK)
+        except Product.DoesNotExist:
+            return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+@api_view(["GET"])
+def get_products_by_bank(request, bank_id):
+    products = Product.objects.filter(bank_id=bank_id)
+    if not products.exists():
+        return Response({"error": "No products found for this bank"}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ProductSerializer(products, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)        
