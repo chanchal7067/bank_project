@@ -289,6 +289,16 @@ def product_list(request, pk=None):
             product = Product.objects.get(pk=pk)
         except Product.DoesNotExist:
             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        bank_id = request.data.get("bank") or product.bank_id
+        product_title = request.data.get("product_title") or product.product_title
+
+        # Check for duplicate product_title in the same bank (excluding current product)
+        if Product.objects.filter(bank_id=bank_id, product_title__iexact=product_title).exclude(id=product.id).exists():
+            return Response(
+                {"error": f"A product with title '{product_title}' already exists for bank ID {bank_id}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         serializer = ProductSerializer(product, data=request.data, partial=True)
         if serializer.is_valid():
