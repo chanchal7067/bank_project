@@ -2,14 +2,60 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import date
-from .models import Customer, Bank, LoanRule, CustomerInterest ,Product
-from .serializers import CustomerSerializer, BankSerializer, LoanRuleSerializer, CustomerInterestSerializer , AdminLoginSerializer , ProductSerializer
+from .models import Customer, Bank, LoanRule, CustomerInterest ,Product, User
+from .serializers import CustomerSerializer, BankSerializer, LoanRuleSerializer, CustomerInterestSerializer , AdminLoginSerializer , ProductSerializer , UserSerializer
 
+# 🔹 Admin Login API
 @api_view(["POST"])
 def admin_login(request):
     serializer = AdminLoginSerializer(data=request.data)
     if serializer.is_valid():
-        return Response({"message": "Admin login successful"}, status=status.HTTP_200_OK)
+        user = serializer.validated_data["user"]
+        return Response(
+            {"message": "Admin login successful", "email": user.email},
+            status=status.HTTP_200_OK
+        )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# 🔹 Create new admin (limit max 3 admins)
+@api_view(["POST"])
+def create_admin(request):
+    if User.objects.filter(role="admin").count() >= 3:
+        return Response({"error": "Maximum 3 admins allowed"}, status=status.HTTP_400_BAD_REQUEST)
+
+    data = request.data
+    data["role"] = "admin"
+    serializer = UserSerializer(data=data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# 🔹 Update admin (email or password)
+@api_view(["PUT"])
+def update_admin(request, pk):
+    try:
+        admin = User.objects.get(pk=pk, role="admin")
+    except User.DoesNotExist:
+        return Response({"error": "Admin not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    old_password = request.data.get("old_password")
+    new_password = request.data.get("new_password")
+
+    # Password update (requires old password)
+    if old_password and new_password:
+        if not admin.check_password(old_password):
+            return Response({"error": "Old password is incorrect"}, status=status.HTTP_400_BAD_REQUEST)
+        admin.set_password(new_password)
+        admin.save()
+        return Response({"message": "Password updated successfully"}, status=status.HTTP_200_OK)
+
+    # Other updates (like email)
+    serializer = UserSerializer(admin, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["POST"])
@@ -325,3 +371,4 @@ def get_products_by_bank(request, bank_id):
 
     serializer = ProductSerializer(products, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)        
+

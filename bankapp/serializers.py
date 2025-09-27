@@ -1,22 +1,25 @@
 from rest_framework import serializers
-from .models import Customer, Bank , LoanRule, CustomerInterest, Product
+from .models import Customer, Bank , LoanRule, CustomerInterest, Product, User
 
 
+# 🔹 Serializer for login
 class AdminLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
-
-    # Hardcoded credentials
-    ADMIN_EMAIL = "admin@example.com"
-    ADMIN_PASSWORD = "admin123"
 
     def validate(self, attrs):
         email = attrs.get("email")
         password = attrs.get("password")
 
-        if email != self.ADMIN_EMAIL or password != self.ADMIN_PASSWORD:
+        try:
+            user = User.objects.get(email=email, role="admin")
+        except User.DoesNotExist:
             raise serializers.ValidationError("Invalid admin credentials")
 
+        if not user.check_password(password):
+            raise serializers.ValidationError("Invalid admin credentials")
+
+        attrs["user"] = user
         return attrs
 
 
@@ -96,3 +99,26 @@ class ProductSerializer(serializers.ModelSerializer):
             "max_roi",
             "foir_details",
         ]        
+
+# 🔹 Serializer for creating/updating users (admins)
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "email", "password", "role"]
+        extra_kwargs = {"password": {"write_only": True}}
+
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        instance.save()
+        return instance

@@ -3,6 +3,8 @@ from . import views
 
 urlpatterns = [
     path("admin/login/", views.admin_login, name="admin_login"),  
+    path("admin/create/", views.create_admin, name="create-admin"),
+    path("admin/update/<int:pk>/", views.update_admin, name="update-admin"),
 
     path("customer/create-or-eligible/", views.customer_create_or_eligible_banks, name="customer_create_or_eligible_banks"),
 

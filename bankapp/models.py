@@ -1,5 +1,6 @@
 from django.db import models
 from cloudinary.models import CloudinaryField
+from django.contrib.auth.hashers import make_password, check_password
 
 
 class Customer(models.Model):
@@ -80,3 +81,23 @@ class Product(models.Model):
 
     def __str__(self):
         return f"{self.bank.bank_name} - {self.product_title}"
+
+# 🔹 New User/Admin model
+class User(models.Model):
+    ROLE_CHOICES = (
+        ("admin", "Admin"),
+        ("user", "User"),
+    )
+
+    email = models.EmailField(unique=True, max_length=100)
+    password = models.CharField(max_length=255)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="user")
+
+    def set_password(self, raw_password):
+        self.password = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.password)
+
+    def __str__(self):
+        return f"{self.email} ({self.role})"
