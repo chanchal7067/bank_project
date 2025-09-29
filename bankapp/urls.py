@@ -8,8 +8,8 @@ urlpatterns = [
 
     path("customer/create-or-eligible/", views.customer_create_or_eligible_banks, name="customer_create_or_eligible_banks"),
 
-    path("banks/", views.bank_list, name="bank_list"),              # GET all, POST
-    path("banks/<int:pk>/", views.bank_list, name="bank_detail"),  # GET one, PUT, DELETE
+    path("banks/", views.bank_list_create, name="bank_list"),              # GET all, POST
+    path("banks/<int:pk>/", views.bank_detail, name="bank_detail"),  # GET one, PUT, DELETE
     path("banks/pincode/<str:pincode>/", views.banks_by_pincode, name="banks-by-pincode"),
 
     path("loanrules/bank/<int:bank_id>/", views.loanrules_by_bank, name="loanrules-by-bank"),

@@ -57,13 +57,39 @@ class CustomerSerializer(serializers.ModelSerializer):
         
 class BankSerializer(serializers.ModelSerializer):
     bank_image_url = serializers.SerializerMethodField()
+    pincode_list = serializers.ListField(
+        child=serializers.CharField(),
+        write_only=True,
+        required=False,
+        help_text="Send a list of pincodes, e.g., ['110001','110002']"
+    )
+
     class Meta:
         model = Bank
-        fields = '__all__'
+        fields = ['id', 'bank_name', 'pincode', 'pincode_list', 'bank_image', 'bank_image_url']
+
     def get_bank_image_url(self, obj):
         if obj.bank_image:
             return obj.bank_image.url  
         return None
+
+    def create(self, validated_data):
+        pincode_list = validated_data.pop('pincode_list', [])
+        if pincode_list:
+            validated_data['pincode'] = ','.join(pincode_list)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        pincode_list = validated_data.pop('pincode_list', None)
+        if pincode_list is not None:
+            validated_data['pincode'] = ','.join(pincode_list)
+        return super().update(instance, validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Return pincode as a list instead of a comma string
+        data['pincode'] = instance.get_pincode_list()
+        return data
 
 class LoanRuleSerializer(serializers.ModelSerializer):
     class Meta:

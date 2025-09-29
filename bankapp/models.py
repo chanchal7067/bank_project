@@ -26,12 +26,21 @@ class Customer(models.Model):
 
 class Bank(models.Model):
     bank_name = models.CharField(max_length=100)
-    state = models.CharField(max_length=50, null=True, blank=True)
-    pincode = models.CharField(max_length=10, null=True, blank=True)
+    pincode = models.CharField(max_length=500, null=True, blank=True,help_text="Enter multiple pincodes separated by commas, e.g., 110001,110002")
     bank_image = CloudinaryField("image", null=True, blank=True)  
     
     def __str__(self):
         return self.bank_name
+    
+    def get_pincode_list(self):
+        if self.pincode:
+            return [p.strip() for p in self.pincode.split(",")]
+        return []
+
+    
+    def has_pincode(self, pincode):
+        """Check if the bank serves the given pincode"""
+        return pincode in self.get_pincode_list()
 
 
 class LoanRule(models.Model):
