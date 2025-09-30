@@ -1,5 +1,6 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework import serializers
 from rest_framework import status
 from datetime import date
 from .models import Customer, Bank, LoanRule, CustomerInterest ,Product, User
@@ -172,27 +173,39 @@ def bank_detail(request, pk):
 
 # Filter banks by a given pincode
 @api_view(['GET'])
-def banks_by_pincode(request, pincode):
-    """
-    Works with single or multiple pincodes.
-    Example:
-    - /v1/api/banks/by-pincodes/110001/
-    - /v1/api/banks/by-pincodes/110001,110002,560001/
-    """
-    pincode_list = [p.strip() for p in pincode.split(',') if p.strip()]
-
-    if not pincode_list:
-        return Response({"error": "No valid pincode provided"}, status=status.HTTP_400_BAD_REQUEST)
+def banks_by_pincodes(request, pincodes):
+    pincode_list = [p.strip() for p in pincodes.split(',') if p.strip()]
     
+    valid_pins = []
+    invalid_pins = []
+
+    # Validate each pincode individually
+    for pin in pincode_list:
+        try:
+            BankSerializer.validate_pincode_list(BankSerializer(), [pin])
+            valid_pins.append(pin)
+        except serializers.ValidationError:
+            invalid_pins.append(pin)
+
+    if not valid_pins:
+        return Response(
+            {"error": [f"All pincodes invalid: {', '.join(invalid_pins)}"]},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Fetch banks for all valid pincodes
     banks = Bank.objects.none()
+    for pin in valid_pins:
+        banks |= Bank.objects.filter(pincode__regex=fr'(^|,){pin}(,|$)')
 
-    for pincode in pincode_list:
-        banks |= Bank.objects.filter(pincode__icontains=pincode)
-
-    banks = banks.distinct()  # remove duplicates
-
+    banks = banks.distinct()
     serializer = BankSerializer(banks, many=True)
-    return Response(serializer.data)
+
+    response_data = {"banks": serializer.data}
+    if invalid_pins:
+        response_data["ignored_invalid_pincodes"] = invalid_pins
+
+    return Response(response_data)
 
 # List, Create, Retrieve, Update, Delete Loan Rules
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
