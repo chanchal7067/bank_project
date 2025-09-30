@@ -57,55 +57,43 @@ class CustomerSerializer(serializers.ModelSerializer):
         
 class BankSerializer(serializers.ModelSerializer):
     bank_image_url = serializers.SerializerMethodField()
-    pincode_list = serializers.ListField(
-        child=serializers.CharField(),
-        write_only=True,
-        required=False,
-        help_text="Send a list of pincodes, e.g., ['110001','110002']"
-    )
-
+    
     class Meta:
         model = Bank
-        fields = ['id', 'bank_name', 'pincode', 'pincode_list', 'bank_image', 'bank_image_url']
+        fields = ['id', 'bank_name', 'pincode', 'bank_image', 'bank_image_url']
 
     def get_bank_image_url(self, obj):
         if obj.bank_image:
-            return obj.bank_image.url  
+            return obj.bank_image.url
         return None
-    
-    # ✅ custom validation for pincode_list
-    def validate_pincode_list(self, value):
-        for pin in value:
-            if not pin.isdigit() or len(pin) != 6:
-                raise serializers.ValidationError(f"Invalid pincode: {pin}. Must be exactly 6 digits.")
-        return value
 
-    # ✅ custom validation for unique bank name
+    # ✅ Validate bank name uniqueness
     def validate_bank_name(self, value):
         qs = Bank.objects.filter(bank_name__iexact=value)
-        if self.instance:  # if update, exclude current instance
+        if self.instance:  # Exclude current instance during update
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError("Bank with this name already exists.")
         return value
 
-    def create(self, validated_data):
-        pincode_list = validated_data.pop('pincode_list', [])
-        if pincode_list:
-            validated_data['pincode'] = ','.join(pincode_list)
-        return super().create(validated_data)
+    # ✅ Validate pincode field
+    def validate_pincode(self, value):
+        if not value:
+            return value  # allow blank/null if model allows
+        pincodes = [p.strip() for p in value.split(',') if p.strip()]
+        for pin in pincodes:
+            if not pin.isdigit() or len(pin) != 6:
+                raise serializers.ValidationError(f"Invalid pincode: {pin}. Must be exactly 6 digits.")
+        # Store back as comma-separated string
+        return ','.join(pincodes)
 
-    def update(self, instance, validated_data):
-        # Handle pincode_list if provided
-        pincode_list = validated_data.pop('pincode_list', None)
-        if pincode_list is not None:
-            validated_data['pincode'] = ','.join(pincode_list)
-        return super().update(instance, validated_data)
-
+    # ✅ Ensure pincodes are returned as a list in response
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        # Return pincode as a list instead of a comma string
-        data['pincode'] = instance.get_pincode_list()
+        if instance.pincode:
+            data['pincode'] = [p.strip() for p in instance.pincode.split(',') if p.strip()]
+        else:
+            data['pincode'] = []
         return data
 
 class LoanRuleSerializer(serializers.ModelSerializer):

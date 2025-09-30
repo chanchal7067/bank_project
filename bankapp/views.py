@@ -175,24 +175,31 @@ def bank_detail(request, pk):
 # Filter banks by a given pincode
 @api_view(['GET'])
 def banks_by_pincodes(request, pincodes):
+    """
+    Filter banks by comma-separated pincodes in URL.
+    Example: /v1/api/banks/pincode/123456,110002/
+    """
     pincode_list = [p.strip() for p in pincodes.split(',') if p.strip()]
     
     valid_pins = []
     invalid_pins = []
 
+    serializer_instance = BankSerializer()  # instance for calling validate_pincode
+
     # Validate each pincode individually
     for pin in pincode_list:
         try:
-            BankSerializer.validate_pincode_list(BankSerializer(), [pin])
+            serializer_instance.validate_pincode(pin)
             valid_pins.append(pin)
         except serializers.ValidationError:
             invalid_pins.append(pin)
 
+    # If no valid pincodes, return empty list
     if not valid_pins:
-        return Response(
-            {"error": [f"All pincodes invalid: {', '.join(invalid_pins)}"]},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({
+            "banks": [],
+            "ignored_invalid_pincodes": invalid_pins
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     # Fetch banks for all valid pincodes
     banks = Bank.objects.none()
@@ -207,6 +214,7 @@ def banks_by_pincodes(request, pincodes):
         response_data["ignored_invalid_pincodes"] = invalid_pins
 
     return Response(response_data)
+
 
 # List, Create, Retrieve, Update, Delete Loan Rules
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
