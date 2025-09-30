@@ -144,10 +144,11 @@ def bank_list_create(request):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        # Return validation errors (e.g., duplicate bank_name or invalid pincodes)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# Retrieve / Update / Delete a bank
+# -------------------- Retrieve / Update / Delete Bank --------------------
 @api_view(['GET', 'PUT', 'DELETE'])
 def bank_detail(request, pk):
     try:
@@ -164,13 +165,13 @@ def bank_detail(request, pk):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
+        # Return validation errors (e.g., duplicate bank_name or invalid pincodes)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         bank.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
+    
 # Filter banks by a given pincode
 @api_view(['GET'])
 def banks_by_pincodes(request, pincodes):

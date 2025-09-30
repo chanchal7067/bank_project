@@ -80,6 +80,15 @@ class BankSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"Invalid pincode: {pin}. Must be exactly 6 digits.")
         return value
 
+    # ✅ custom validation for unique bank name
+    def validate_bank_name(self, value):
+        qs = Bank.objects.filter(bank_name__iexact=value)
+        if self.instance:  # if update, exclude current instance
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("Bank with this name already exists.")
+        return value
+
     def create(self, validated_data):
         pincode_list = validated_data.pop('pincode_list', [])
         if pincode_list:
@@ -87,6 +96,7 @@ class BankSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        # Handle pincode_list if provided
         pincode_list = validated_data.pop('pincode_list', None)
         if pincode_list is not None:
             validated_data['pincode'] = ','.join(pincode_list)
