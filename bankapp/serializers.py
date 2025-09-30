@@ -72,6 +72,13 @@ class BankSerializer(serializers.ModelSerializer):
         if obj.bank_image:
             return obj.bank_image.url  
         return None
+    
+    # ✅ custom validation for pincode_list
+    def validate_pincode_list(self, value):
+        for pin in value:
+            if not pin.isdigit() or len(pin) != 6:
+                raise serializers.ValidationError(f"Invalid pincode: {pin}. Must be exactly 6 digits.")
+        return value
 
     def create(self, validated_data):
         pincode_list = validated_data.pop('pincode_list', [])

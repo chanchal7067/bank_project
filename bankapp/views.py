@@ -173,7 +173,24 @@ def bank_detail(request, pk):
 # Filter banks by a given pincode
 @api_view(['GET'])
 def banks_by_pincode(request, pincode):
-    banks = Bank.objects.filter(pincode__icontains=pincode)
+    """
+    Works with single or multiple pincodes.
+    Example:
+    - /v1/api/banks/by-pincodes/110001/
+    - /v1/api/banks/by-pincodes/110001,110002,560001/
+    """
+    pincode_list = [p.strip() for p in pincode.split(',') if p.strip()]
+
+    if not pincode_list:
+        return Response({"error": "No valid pincode provided"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    banks = Bank.objects.none()
+
+    for pincode in pincode_list:
+        banks |= Bank.objects.filter(pincode__icontains=pincode)
+
+    banks = banks.distinct()  # remove duplicates
+
     serializer = BankSerializer(banks, many=True)
     return Response(serializer.data)
 
