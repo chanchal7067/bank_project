@@ -24,4 +24,8 @@ urlpatterns = [
 
     path("products/bank/<int:bank_id>/", views.get_products_by_bank, name="products-by-bank"),
 
+    path('managed-cards/', views.managed_card_list_create, name='managed-card-list-create'),
+    path('managed-cards/<int:pk>/', views.managed_card_detail, name='managed-card-detail'),
+
+
 ]

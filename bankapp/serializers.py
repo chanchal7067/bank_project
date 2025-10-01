@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Customer, Bank , LoanRule, CustomerInterest, Product, User
+from .models import Customer, Bank , LoanRule, CustomerInterest, Product, User, ManagedCard
 
 
 # 🔹 Serializer for login
@@ -154,3 +154,15 @@ class UserSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+class ManagedCardSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ManagedCard
+        fields = ['id', 'title', 'url', 'image', 'image_url']
+
+    def get_image_url(self, obj):
+        if obj.image:
+            return obj.image.url
+        return None

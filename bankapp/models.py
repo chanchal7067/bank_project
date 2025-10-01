@@ -112,3 +112,11 @@ class User(models.Model):
 
     def __str__(self):
         return f"{self.email} ({self.role})"
+    
+class ManagedCard(models.Model):
+    image = CloudinaryField('image')  # store in cloudinary
+    title = models.CharField(max_length=255)
+    url = models.URLField()
+   
+    def __str__(self):
+        return self.title    
