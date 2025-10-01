@@ -128,6 +128,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "max_loan_amount",
             "min_roi",
             "max_roi",
+            "salary",
             "foir_details",
         ]        
 

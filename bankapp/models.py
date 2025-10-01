@@ -85,6 +85,8 @@ class Product(models.Model):
     min_roi = models.FloatField(null=True, blank=True)
     max_roi = models.FloatField(null=True, blank=True)
 
+    salary = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+
     # FOIR (string so it can store formatted descriptions like "40% of salary")
     foir_details = models.CharField(max_length=255, null=True, blank=True)
 
