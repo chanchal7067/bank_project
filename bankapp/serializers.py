@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Customer, Bank , LoanRule, CustomerInterest, Product, User, ManagedCard
+from .models import Customer, Bank , LoanRule, CustomerInterest, Product, User, ManagedCard, CompanyCategory, Company, SalaryCriteria
 
 
 # 🔹 Serializer for login
@@ -166,3 +166,41 @@ class ManagedCardSerializer(serializers.ModelSerializer):
         if obj.image:
             return obj.image.url
         return None
+    
+class CompanyCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompanyCategory
+        fields = "__all__"    
+
+    def validate_category_name(self, value):
+        # Case-insensitive uniqueness check
+        qs = CompanyCategory.objects.filter(category_name__iexact=value)
+
+        # Exclude current instance in case of update
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise serializers.ValidationError("Category name already exists (case-insensitive).")
+
+        return value
+
+class CompanySerializer(serializers.ModelSerializer):
+    category = CompanyCategorySerializer(read_only=True)   # show category details
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=CompanyCategory.objects.all(), write_only=True, source="category"
+    )
+
+    class Meta:
+        model = Company
+        fields = ['company_id', 'company_name', 'category', 'category_id']
+
+class SalaryCriteriaSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.product_title", read_only=True)
+    category_name = serializers.CharField(source="category.category_name", read_only=True)
+
+    class Meta:
+        model = SalaryCriteria
+        fields = ['salary_id', 'product', 'product_name', 'category', 'category_name', 'min_salary']
+
+        

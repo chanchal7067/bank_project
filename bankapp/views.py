@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework import serializers
 from rest_framework import status
 from datetime import date
-from .models import Customer, Bank, LoanRule, CustomerInterest ,Product, User, ManagedCard
-from .serializers import CustomerSerializer, BankSerializer, LoanRuleSerializer, CustomerInterestSerializer , AdminLoginSerializer , ProductSerializer , UserSerializer, ManagedCardSerializer
+from .models import Customer, Bank, LoanRule, CustomerInterest ,Product, User, ManagedCard, CompanyCategory, Company, SalaryCriteria
+from .serializers import CustomerSerializer, BankSerializer, LoanRuleSerializer, CustomerInterestSerializer , AdminLoginSerializer , ProductSerializer , UserSerializer, ManagedCardSerializer , CompanyCategorySerializer, CompanySerializer , SalaryCriteriaSerializer
 
 # 🔹 Admin Login API
 @api_view(["POST"])
@@ -431,4 +431,118 @@ def managed_card_detail(request, pk):
 
     elif request.method == 'DELETE':
         card.delete()
+        return Response(status=status.HTTP_200_OK)
+
+@api_view(['GET', 'POST'])
+def company_category_list_create(request):
+    if request.method == 'GET':
+        categories = CompanyCategory.objects.all()
+        serializer = CompanyCategorySerializer(categories, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = CompanyCategorySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Retrieve, Update, Delete single category
+@api_view(['GET', 'PUT', 'DELETE'])
+def company_category_detail(request, pk):
+    try:
+        category = CompanyCategory.objects.get(pk=pk)
+    except CompanyCategory.DoesNotExist:
+        return Response({"error": "Category not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = CompanyCategorySerializer(category)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = CompanyCategorySerializer(category, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        category.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)        
+    
+# List + Create
+@api_view(['GET', 'POST'])
+def company_list_create(request):
+    if request.method == 'GET':
+        companies = Company.objects.all()
+        serializer = CompanySerializer(companies, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = CompanySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Retrieve + Update + Delete
+@api_view(['GET', 'PUT', 'DELETE'])
+def company_detail(request, pk):
+    try:
+        company = Company.objects.get(pk=pk)
+    except Company.DoesNotExist:
+        return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = CompanySerializer(company)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = CompanySerializer(company, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        company.delete()
+        return Response(status=status.HTTP_200_OK)
+    
+@api_view(['GET', 'POST'])
+def salary_criteria_list_create(request):
+    if request.method == 'GET':
+        criteria = SalaryCriteria.objects.all()
+        serializer = SalaryCriteriaSerializer(criteria, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = SalaryCriteriaSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+def salary_criteria_detail(request, pk):
+    try:
+        criteria = SalaryCriteria.objects.get(pk=pk)
+    except SalaryCriteria.DoesNotExist:
+        return Response({"error": "Salary Criteria not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = SalaryCriteriaSerializer(criteria)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = SalaryCriteriaSerializer(criteria, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        criteria.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)    

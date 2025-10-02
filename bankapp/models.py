@@ -85,8 +85,6 @@ class Product(models.Model):
     min_roi = models.FloatField(null=True, blank=True)
     max_roi = models.FloatField(null=True, blank=True)
 
-    salary = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
-
     # FOIR (string so it can store formatted descriptions like "40% of salary")
     foir_details = models.CharField(max_length=255, null=True, blank=True)
 
@@ -120,3 +118,29 @@ class ManagedCard(models.Model):
    
     def __str__(self):
         return self.title    
+    
+class CompanyCategory(models.Model):
+    category_id = models.AutoField(primary_key=True)   # Auto increment ID
+    category_name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.category_name
+
+class Company(models.Model):
+    company_id = models.AutoField(primary_key=True)
+    company_name = models.CharField(max_length=200, unique=True)
+    category = models.ForeignKey(
+        CompanyCategory, on_delete=models.CASCADE, related_name="companies"
+    )
+
+    def __str__(self):
+        return self.company_name
+
+class SalaryCriteria(models.Model):
+    salary_id = models.AutoField(primary_key=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="salary_criteria")
+    category = models.ForeignKey(CompanyCategory, on_delete=models.CASCADE, related_name="salary_criteria")
+    min_salary = models.DecimalField(max_digits=12, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.product.product_title} - {self.category.category_name} - {self.min_salary}"            

@@ -26,6 +26,13 @@ urlpatterns = [
 
     path('managed-cards/', views.managed_card_list_create, name='managed-card-list-create'),
     path('managed-cards/<int:pk>/', views.managed_card_detail, name='managed-card-detail'),
+    
+    path('company-categories/', views.company_category_list_create, name='company-category-list'),
+    path('company-categories/<int:pk>/', views.company_category_detail, name='company-category-detail'),
+    
+    path('companies/', views.company_list_create, name="company-list-create"),
+    path('companies/<int:pk>/', views.company_detail, name="company-detail"),
 
-
+    path('salary-criteria/', views.salary_criteria_list_create, name="salary-criteria-list-create"),
+    path('salary-criteria/<int:pk>/', views.salary_criteria_detail, name="salary-criteria-detail"),
 ]
