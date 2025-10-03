@@ -119,11 +119,21 @@ class SalaryCriteriaSerializer(serializers.ModelSerializer):
 
         
 # Product Serializer
+from rest_framework import serializers
+from .models import Product, SalaryCriteria, CompanyCategory
+
+class SalaryCriteriaSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.category_name", read_only=True)
+
+    class Meta:
+        model = SalaryCriteria
+        fields = ['salary_id', 'category', 'category_name', 'min_salary']
+
 class ProductSerializer(serializers.ModelSerializer):
     salary_criteria = SalaryCriteriaSerializer(many=True, read_only=True)
 
-    # Accept categories from frontend (either dict or list)
-    categories = serializers.ListField(write_only=True, required=False, child=serializers.DictField())
+    # Accept categories from frontend as dict
+    categories = serializers.DictField(write_only=True, required=False)
 
     class Meta:
         model = Product
@@ -145,28 +155,47 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        categories_input = validated_data.pop("categories", [])
+        categories_input = validated_data.pop("categories", {})
 
-        # If frontend sends a dictionary instead of list, convert it to list
-        if categories_input and isinstance(categories_input, dict):
-            categories_input = [{"category_name": k, "min_salary": v} for k, v in categories_input.items()]
-
-        # Create the product
+        # Create Product
         product = super().create(validated_data)
 
         # Create SalaryCriteria entries
-        for item in categories_input:
-            category_name = item.get("category_name")
-            salary = item.get("min_salary")
-            if category_name and salary and float(salary) > 0:
-                category, _ = CompanyCategory.objects.get_or_create(category_name=category_name)
-                SalaryCriteria.objects.create(
-                    product=product,
-                    category=category,
-                    min_salary=salary
-                )
+        for key, salary in categories_input.items():
+            if salary is None:
+                continue
+            # Replace underscores with spaces to match your CompanyCategory names
+            category_name = key.replace("_", " ")
+            category, _ = CompanyCategory.objects.get_or_create(category_name=category_name)
+            SalaryCriteria.objects.create(
+                product=product,
+                category=category,
+                min_salary=salary
+            )
 
         return product
+
+    def update(self, instance, validated_data):
+        categories_input = validated_data.pop("categories", {})
+
+        # Update Product fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Update or create SalaryCriteria entries
+        for key, salary in categories_input.items():
+            if salary is None:
+                continue
+            category_name = key.replace("_", " ")
+            category, _ = CompanyCategory.objects.get_or_create(category_name=category_name)
+            SalaryCriteria.objects.update_or_create(
+                product=instance,
+                category=category,
+                defaults={"min_salary": salary}
+            )
+
+        return instance
     
 
 # 🔹 Serializer for creating/updating users (admins)
