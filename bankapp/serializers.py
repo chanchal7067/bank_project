@@ -119,16 +119,16 @@ class SalaryCriteriaSerializer(serializers.ModelSerializer):
 
         
 class ProductSerializer(serializers.ModelSerializer):
-    # bank_name is read-only, fetched from the related Bank model
-    bank_name = serializers.CharField(source="bank.bank_name", read_only=True)
     salary_criteria = SalaryCriteriaSerializer(many=True, read_only=True)
+
+    # Accept category salaries from frontend
+    categories = serializers.DictField(write_only=True, required=False)
 
     class Meta:
         model = Product
         fields = [
             "id",
-            "bank",          # this is bank_id
-            "bank_name",     # comes from related bank
+            "bank",
             "product_title",
             "min_age",
             "max_age",
@@ -139,9 +139,29 @@ class ProductSerializer(serializers.ModelSerializer):
             "min_roi",
             "max_roi",
             "foir_details",
-            "salary_criteria", 
-        ]        
+            "categories",
+            "salary_criteria",
+        ]
 
+    def create(self, validated_data):
+        # Extract categories dict
+        categories_input = validated_data.pop("categories", {})
+
+        # Create Product
+        product = super().create(validated_data)
+
+        # Create SalaryCriteria rows for each category with salary > 0
+        for category_name, salary in categories_input.items():
+            if salary and float(salary) > 0:
+                category, _ = CompanyCategory.objects.get_or_create(category_name=category_name)
+                SalaryCriteria.objects.create(
+                    product=product,
+                    category=category,
+                    min_salary=salary
+                )
+
+        return product
+    
 # 🔹 Serializer for creating/updating users (admins)
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
