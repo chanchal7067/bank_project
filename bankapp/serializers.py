@@ -107,11 +107,21 @@ class CustomerInterestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomerInterest
-        fields = ["id", "customer", "customer_name", "bank", "bank_name"]        
+        fields = ["id", "customer", "customer_name", "bank", "bank_name"]      
+
+class SalaryCriteriaSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.product_title", read_only=True)
+    category_name = serializers.CharField(source="category.category_name", read_only=True)
+
+    class Meta:
+        model = SalaryCriteria
+        fields = ['salary_id', 'product', 'product_name', 'category', 'category_name', 'min_salary']
+
         
 class ProductSerializer(serializers.ModelSerializer):
     # bank_name is read-only, fetched from the related Bank model
     bank_name = serializers.CharField(source="bank.bank_name", read_only=True)
+    salary_criteria = SalaryCriteriaSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
@@ -129,6 +139,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "min_roi",
             "max_roi",
             "foir_details",
+            "salary_criteria", 
         ]        
 
 # 🔹 Serializer for creating/updating users (admins)
@@ -194,12 +205,5 @@ class CompanySerializer(serializers.ModelSerializer):
         model = Company
         fields = ['company_id', 'company_name', 'category', 'category_id']
 
-class SalaryCriteriaSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source="product.product_title", read_only=True)
-    category_name = serializers.CharField(source="category.category_name", read_only=True)
-
-    class Meta:
-        model = SalaryCriteria
-        fields = ['salary_id', 'product', 'product_name', 'category', 'category_name', 'min_salary']
 
         
