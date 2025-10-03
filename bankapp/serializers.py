@@ -118,11 +118,15 @@ class SalaryCriteriaSerializer(serializers.ModelSerializer):
         fields = ['salary_id', 'product', 'product_name', 'category', 'category_name', 'min_salary']
 
         
+# Product Serializer
 class ProductSerializer(serializers.ModelSerializer):
     salary_criteria = SalaryCriteriaSerializer(many=True, read_only=True)
-
-    # Accept category salaries from frontend
+    
+    # Accept category salaries from frontend (write-only)
     categories = serializers.DictField(write_only=True, required=False)
+
+    # Optional: return categories actually saved
+    categories_added = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Product
@@ -141,6 +145,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "foir_details",
             "categories",
             "salary_criteria",
+            "categories_added",
         ]
 
     def create(self, validated_data):
@@ -161,6 +166,11 @@ class ProductSerializer(serializers.ModelSerializer):
                 )
 
         return product
+
+    def get_categories_added(self, obj):
+        # Return list of category names saved for this product
+        return [sc.category.category_name for sc in obj.salary_criteria.all()]
+    
     
 # 🔹 Serializer for creating/updating users (admins)
 class UserSerializer(serializers.ModelSerializer):

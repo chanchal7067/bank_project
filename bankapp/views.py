@@ -345,10 +345,12 @@ def product_list(request, pk=None):
                 {"error": f"A product with title '{product_title}' already exists for bank ID {bank_id}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
         serializer = ProductSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            product = serializer.save()  # Save product & SalaryCriteria
+            response_serializer = ProductSerializer(product)  # Re-serialize to include salary_criteria
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     # -------------------- PUT --------------------
@@ -359,11 +361,11 @@ def product_list(request, pk=None):
             product = Product.objects.get(pk=pk)
         except Product.DoesNotExist:
             return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
-        
-        bank_id = request.data.get("bank") or product.bank_id
-        product_title = request.data.get("product_title") or product.product_title
 
-        # Check for duplicate product_title in the same bank (excluding current product)
+        bank_id = request.data.get("bank", product.bank_id)
+        product_title = request.data.get("product_title", product.product_title)
+
+        # Check for duplicate product_title in the same bank
         if Product.objects.filter(bank_id=bank_id, product_title__iexact=product_title).exclude(id=product.id).exists():
             return Response(
                 {"error": f"A product with title '{product_title}' already exists for bank ID {bank_id}"},
@@ -372,8 +374,26 @@ def product_list(request, pk=None):
 
         serializer = ProductSerializer(product, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            product = serializer.save()
+
+            # Handle categories update (salary criteria)
+            categories_input = request.data.get("categories", {})
+            for category_name, salary in categories_input.items():
+                if salary and float(salary) > 0:
+                    category, _ = CompanyCategory.objects.get_or_create(category_name=category_name)
+                    sc, created = SalaryCriteria.objects.get_or_create(product=product, category=category)
+                    sc.min_salary = salary
+                    sc.save()
+                else:
+                    # If salary is 0 or missing, remove SalaryCriteria
+                    try:
+                        category = CompanyCategory.objects.get(category_name=category_name)
+                        SalaryCriteria.objects.filter(product=product, category=category).delete()
+                    except CompanyCategory.DoesNotExist:
+                        pass
+
+            response_serializer = ProductSerializer(product)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     # -------------------- DELETE --------------------
@@ -392,7 +412,6 @@ def get_products_by_bank(request, bank_id):
     products = Product.objects.filter(bank_id=bank_id)
     if not products.exists():
         return Response({"error": "No products found for this bank"}, status=status.HTTP_404_NOT_FOUND)
-
     serializer = ProductSerializer(products, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)        
 
