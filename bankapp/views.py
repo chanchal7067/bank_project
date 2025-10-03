@@ -469,7 +469,7 @@ def company_category_detail(request, pk):
 
     elif request.method == 'DELETE':
         category.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)        
+        return Response(status=status.HTTP_200_OK)        
     
 # List + Create
 @api_view(['GET', 'POST'])
@@ -545,4 +545,4 @@ def salary_criteria_detail(request, pk):
 
     elif request.method == 'DELETE':
         criteria.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)    
+        return Response(status=status.HTTP_200_OK)    
