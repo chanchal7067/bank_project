@@ -121,12 +121,9 @@ class SalaryCriteriaSerializer(serializers.ModelSerializer):
 # Product Serializer
 class ProductSerializer(serializers.ModelSerializer):
     salary_criteria = SalaryCriteriaSerializer(many=True, read_only=True)
-    
-    # Accept category salaries from frontend (write-only)
-    categories = serializers.DictField(write_only=True, required=False)
 
-    # Optional: return categories actually saved
-    categories_added = serializers.SerializerMethodField(read_only=True)
+    # Accept categories from frontend (either dict or list)
+    categories = serializers.ListField(write_only=True, required=False, child=serializers.DictField())
 
     class Meta:
         model = Product
@@ -145,19 +142,23 @@ class ProductSerializer(serializers.ModelSerializer):
             "foir_details",
             "categories",
             "salary_criteria",
-            "categories_added",
         ]
 
     def create(self, validated_data):
-        # Extract categories dict
-        categories_input = validated_data.pop("categories", {})
+        categories_input = validated_data.pop("categories", [])
 
-        # Create Product
+        # If frontend sends a dictionary instead of list, convert it to list
+        if categories_input and isinstance(categories_input, dict):
+            categories_input = [{"category_name": k, "min_salary": v} for k, v in categories_input.items()]
+
+        # Create the product
         product = super().create(validated_data)
 
-        # Create SalaryCriteria rows for each category with salary > 0
-        for category_name, salary in categories_input.items():
-            if salary and float(salary) > 0:
+        # Create SalaryCriteria entries
+        for item in categories_input:
+            category_name = item.get("category_name")
+            salary = item.get("min_salary")
+            if category_name and salary and float(salary) > 0:
                 category, _ = CompanyCategory.objects.get_or_create(category_name=category_name)
                 SalaryCriteria.objects.create(
                     product=product,
@@ -166,12 +167,8 @@ class ProductSerializer(serializers.ModelSerializer):
                 )
 
         return product
+    
 
-    def get_categories_added(self, obj):
-        # Return list of category names saved for this product
-        return [sc.category.category_name for sc in obj.salary_criteria.all()]
-    
-    
 # 🔹 Serializer for creating/updating users (admins)
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
