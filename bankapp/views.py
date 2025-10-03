@@ -317,95 +317,81 @@ def customer_interests_by_customer(request, customer_id):
     interests = CustomerInterest.objects.filter(customer_id=customer_id)
     serializer = CustomerInterestSerializer(interests, many=True)
     return Response(serializer.data) 
-
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
 def product_list(request, pk=None):
     # -------------------- GET --------------------
     if request.method == 'GET':
-        if pk:  # Get single product
+        if pk:
             try:
                 product = Product.objects.get(pk=pk)
                 serializer = ProductSerializer(product)
-                return Response(serializer.data, status=status.HTTP_200_OK)
+                return Response(serializer.data)
             except Product.DoesNotExist:
-                return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
-        else:  # Get all products
+                return Response({"error": "Product not found"}, status=404)
+        else:
             products = Product.objects.all()
             serializer = ProductSerializer(products, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data)
 
     # -------------------- POST --------------------
     elif request.method == 'POST':
-        bank_id = request.data.get("bank")
-        product_title = request.data.get("product_title")
-
-        # Check for duplicate product in the same bank
-        if Product.objects.filter(bank_id=bank_id, product_title__iexact=product_title).exists():
-            return Response(
-                {"error": f"A product with title '{product_title}' already exists for bank ID {bank_id}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         serializer = ProductSerializer(data=request.data)
         if serializer.is_valid():
-            product = serializer.save()  # Save product & SalaryCriteria
-            response_serializer = ProductSerializer(product)  # Re-serialize to include salary_criteria
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            product = serializer.save()
+            return Response(ProductSerializer(product).data, status=201)
+        return Response(serializer.errors, status=400)
 
     # -------------------- PUT --------------------
     elif request.method == 'PUT':
         if not pk:
-            return Response({"error": "Product ID required for update"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Product ID required"}, status=400)
         try:
             product = Product.objects.get(pk=pk)
         except Product.DoesNotExist:
-            return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        bank_id = request.data.get("bank", product.bank_id)
-        product_title = request.data.get("product_title", product.product_title)
-
-        # Check for duplicate product_title in the same bank
-        if Product.objects.filter(bank_id=bank_id, product_title__iexact=product_title).exclude(id=product.id).exists():
-            return Response(
-                {"error": f"A product with title '{product_title}' already exists for bank ID {bank_id}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Product not found"}, status=404)
 
         serializer = ProductSerializer(product, data=request.data, partial=True)
         if serializer.is_valid():
             product = serializer.save()
 
-            # Handle categories update (salary criteria)
-            categories_input = request.data.get("categories", {})
-            for category_name, salary in categories_input.items():
-                if salary and float(salary) > 0:
+            # Handle SalaryCriteria update
+            categories_input = request.data.get("categories", [])
+
+            # Convert dict to list if necessary
+            if categories_input and isinstance(categories_input, dict):
+                categories_input = [{"category_name": k, "min_salary": v} for k, v in categories_input.items()]
+
+            existing_sc = SalaryCriteria.objects.filter(product=product)
+
+            # Update or create new salary criteria
+            for item in categories_input:
+                category_name = item.get("category_name")
+                salary = item.get("min_salary")
+                if category_name and salary and float(salary) > 0:
                     category, _ = CompanyCategory.objects.get_or_create(category_name=category_name)
                     sc, created = SalaryCriteria.objects.get_or_create(product=product, category=category)
                     sc.min_salary = salary
                     sc.save()
-                else:
-                    # If salary is 0 or missing, remove SalaryCriteria
-                    try:
-                        category = CompanyCategory.objects.get(category_name=category_name)
-                        SalaryCriteria.objects.filter(product=product, category=category).delete()
-                    except CompanyCategory.DoesNotExist:
-                        pass
+            
+            # Optionally: Remove categories that are not sent in update
+            sent_category_names = [item.get("category_name") for item in categories_input]
+            SalaryCriteria.objects.filter(product=product).exclude(category__category_name__in=sent_category_names).delete()
 
-            response_serializer = ProductSerializer(product)
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(ProductSerializer(product).data)
+
+        return Response(serializer.errors, status=400)
 
     # -------------------- DELETE --------------------
     elif request.method == 'DELETE':
         if not pk:
-            return Response({"error": "Product ID required for delete"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Product ID required"}, status=400)
         try:
             product = Product.objects.get(pk=pk)
             product.delete()
-            return Response({"message": "Product deleted successfully"}, status=status.HTTP_200_OK)
+            return Response({"message": "Product deleted"})
         except Product.DoesNotExist:
-            return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Product not found"}, status=404)
+
         
 @api_view(["GET"])
 def get_products_by_bank(request, bank_id):
