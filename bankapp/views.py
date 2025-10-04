@@ -609,3 +609,113 @@ def salary_criteria_detail(request, pk):
     elif request.method == 'DELETE':
         criteria.delete()
         return Response(status=status.HTTP_200_OK)    
+
+
+
+
+
+@api_view(["GET"])
+def get_all_eligibility_checks(request):
+    """
+    Get all customers who have checked their loan eligibility.
+    Includes personal details, salary, company category,
+    age, and all eligible banks/products.
+    """
+    try:
+        # ✅ Removed ordering by updated_at
+        customers = Customer.objects.all()
+
+        if not customers.exists():
+            return Response({
+                "status": "success",
+                "message": "No customers have checked eligibility yet.",
+                "data": []
+            }, status=status.HTTP_200_OK)
+
+        response_data = []
+
+        for customer in customers:
+            # Calculate age
+            age = None
+            if customer.dob:
+                today = date.today()
+                age = today.year - customer.dob.year - (
+                    (today.month, today.day) < (customer.dob.month, customer.dob.day)
+                )
+
+            # Get company category
+            company_category = None
+            company_name = getattr(customer, "companyName", "")
+            if company_name:
+                company_obj = Company.objects.filter(company_name__iexact=company_name).first()
+                if company_obj and company_obj.category:
+                    company_category = company_obj.category
+                else:
+                    company_category, _ = CompanyCategory.objects.get_or_create(category_name="UNLISTED")
+            else:
+                company_category, _ = CompanyCategory.objects.get_or_create(category_name="UNLISTED")
+
+            # Get eligible banks for this customer
+            eligible_banks = []
+            for bank in Bank.objects.all():
+                bank_pins = bank.get_pincode_list()
+                if customer.pincode not in bank_pins:
+                    continue  # skip if pincode not served
+
+                for product in Product.objects.filter(bank=bank):
+                    # Check age range
+                    if product.min_age and product.max_age:
+                        if not (product.min_age <= age <= product.max_age):
+                            continue
+
+                    # Salary check
+                    salary_criteria = SalaryCriteria.objects.filter(
+                        product=product, category=company_category
+                    )
+
+                    if not salary_criteria.exists():
+                        continue
+
+                    for criteria in salary_criteria:
+                        if float(customer.salary) >= float(criteria.min_salary):
+                            eligible_banks.append({
+                                "bank_id": bank.id,
+                                "bank_name": bank.bank_name,
+                                "product_id": product.id,
+                                "product_name": product.product_title,
+                                "min_salary_required": float(criteria.min_salary),
+                                "applicant_salary": float(customer.salary),
+                                "roi_range": f"{product.min_roi}%-{product.max_roi}%" if product.min_roi and product.max_roi else "N/A",
+                                "tenure_range": f"{product.min_tenure}-{product.max_tenure} months" if product.min_tenure and product.max_tenure else "N/A",
+                                "loan_amount_range": {
+                                    "min": float(product.min_loan_amount) if product.min_loan_amount else 0,
+                                    "max": float(product.max_loan_amount) if product.max_loan_amount else float(customer.salary) * 5
+                                }
+                            })
+                            break  # only need one valid criteria
+
+            # Build customer data
+            customer_data = CustomerSerializer(customer).data
+            customer_data.update({
+                "age": age,
+                "company_category": company_category.category_name if company_category else "N/A",
+                "eligibility_status": "Eligible" if eligible_banks else "Not Eligible",
+                "eligible_banks_count": len(eligible_banks),
+                "eligible_banks": eligible_banks,
+            })
+
+            response_data.append(customer_data)
+
+        return Response({
+            "status": "success",
+            "message": "All customers who checked eligibility",
+            "count": len(response_data),
+            "data": response_data
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            "status": "error",
+            "message": "Error while fetching eligibility data",
+            "error": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

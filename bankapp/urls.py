@@ -32,4 +32,7 @@ urlpatterns = [
 
     path('salary-criteria/', views.salary_criteria_list_create, name="salary-criteria-list-create"),
     path('salary-criteria/<int:pk>/', views.salary_criteria_detail, name="salary-criteria-detail"),
+
+
+    path ('get-all-eligiblity-checks/', views.get_all_eligibility_checks, name='get-all-eligiblity-checks'),
 ]
