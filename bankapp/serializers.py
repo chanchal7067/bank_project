@@ -122,7 +122,7 @@ class SalaryCriteriaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SalaryCriteria
-        fields = ['salary_id', 'category', 'category_name', 'min_salary']
+        fields = ['salary_id','product', 'category', 'category_name', 'min_salary']
 
 class ProductSerializer(serializers.ModelSerializer):
     salary_criteria = SalaryCriteriaSerializer(many=True, read_only=True)
