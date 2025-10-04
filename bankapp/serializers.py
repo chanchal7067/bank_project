@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Customer, Bank , LoanRule, CustomerInterest, Product, User, ManagedCard, CompanyCategory, Company, SalaryCriteria
+from .models import Customer, Bank, CustomerInterest, Product, User, ManagedCard, CompanyCategory, Company, SalaryCriteria
 
 
 # 🔹 Serializer for login
@@ -95,11 +95,6 @@ class BankSerializer(serializers.ModelSerializer):
         else:
             data['pincode'] = []
         return data
-
-class LoanRuleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LoanRule
-        fields = '__all__'        
 
 class CustomerInterestSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source="customer.full_name", read_only=True)

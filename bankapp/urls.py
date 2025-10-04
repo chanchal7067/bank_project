@@ -12,9 +12,6 @@ urlpatterns = [
     path("banks/<int:pk>/", views.bank_detail, name="bank_detail"),  # GET one, PUT, DELETE
     path("banks/pincode/<str:pincodes>/", views.banks_by_pincodes, name="banks-by-pincode"),
 
-    path("loanrules/bank/<int:bank_id>/", views.loanrules_by_bank, name="loanrules-by-bank"),
-    path("loanrules/<int:pk>/", views.loanrule_list, name="loanrule-detail"),
-    path("loanrules/", views.loanrule_list, name="loanrule-list"),
 
     path("customer-interests/", views.customer_interest_list_create, name="customer-interest-list-create"),
     path("customer-interests/customer/<int:customer_id>/", views.customer_interests_by_customer, name="customer-interests-by-customer"),

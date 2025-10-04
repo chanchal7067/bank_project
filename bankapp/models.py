@@ -20,6 +20,8 @@ class Customer(models.Model):
     companyName = models.CharField(max_length=100, null=True, blank=True)
     designation = models.CharField(max_length=100, null=True, blank=True)
 
+    company = models.ForeignKey("Company", on_delete=models.SET_NULL, null=True, blank=True, related_name="customers")
+
     def __str__(self):
         return self.full_name
 
@@ -41,21 +43,6 @@ class Bank(models.Model):
     def has_pincode(self, pincode):
         """Check if the bank serves the given pincode"""
         return pincode in self.get_pincode_list()
-
-
-class LoanRule(models.Model):
-    bank = models.ForeignKey(Bank, on_delete=models.CASCADE, related_name="loan_rules")
-    min_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    job_type = models.CharField(max_length=50, null=True, blank=True)
-    min_age = models.IntegerField(null=True, blank=True)
-    max_age = models.IntegerField(null=True, blank=True)
-    
-    tenure = models.IntegerField(help_text="Tenure in months or years", null=True, blank=True)
-    min_rate = models.FloatField(null=True, blank=True)
-    max_rate = models.FloatField(null=True, blank=True)
-    
-    def __str__(self):
-        return f"{self.bank.bank_name} Rule ({self.min_salary}+)"
 
 
 class CustomerInterest(models.Model):

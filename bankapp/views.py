@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework import serializers
 from rest_framework import status
 from datetime import date
-from .models import Customer, Bank, LoanRule, CustomerInterest ,Product, User, ManagedCard, CompanyCategory, Company, SalaryCriteria
-from .serializers import CustomerSerializer, BankSerializer, LoanRuleSerializer, CustomerInterestSerializer , AdminLoginSerializer , ProductSerializer , UserSerializer, ManagedCardSerializer , CompanyCategorySerializer, CompanySerializer , SalaryCriteriaSerializer
+from .models import Customer, Bank, CustomerInterest ,Product, User, ManagedCard, CompanyCategory, Company, SalaryCriteria
+from .serializers import CustomerSerializer, BankSerializer, CustomerInterestSerializer , AdminLoginSerializer , ProductSerializer , UserSerializer, ManagedCardSerializer , CompanyCategorySerializer, CompanySerializer , SalaryCriteriaSerializer
 
 # 🔹 Admin Login API
 @api_view(["POST"])
@@ -61,12 +61,33 @@ def update_admin(request, pk):
 
 @api_view(["POST"])
 def customer_create_or_eligible_banks(request):
+    """
+    Check loan eligibility for a customer based on:
+    - Company category and salary criteria
+    - Age limits from product
+    - Bank coverage by pincode
+    Returns list of eligible banks with product details
+    """
     try:
         data = request.data
+        
+        # Step 1: Validate Required Fields
+        required_fields = ["full_name", "email", "phone", "dob", "salary", "pincode"]
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        if missing_fields:
+            return Response({
+                "status": "error",
+                "message": f"Missing required fields: {', '.join(missing_fields)}"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         email = data.get("email")
         phone = data.get("phone")
-
-        # Check if customer exists (by email OR phone)
+        company_name = data.get("companyName", "").strip()
+        applicant_salary = float(data.get("salary", 0))
+        applicant_pincode = str(data.get("pincode", "")).strip()
+        
+        # Check if customer exists
         customer = Customer.objects.filter(email=email).first() or Customer.objects.filter(phone=phone).first()
         action = "updated" if customer else "created"
 
@@ -76,62 +97,184 @@ def customer_create_or_eligible_banks(request):
         else:
             serializer = CustomerSerializer(data=data)
 
-        if serializer.is_valid():
-            customer = serializer.save()
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        customer = serializer.save()
 
-            # 🔹 Annual Income
-            if customer.salary:
-                customer.annualIncome = float(customer.salary) * 12
-                customer.save()
+        # Calculate Annual Income
+        if customer.salary:
+            customer.annualIncome = float(customer.salary) * 12
+            customer.save()
 
-            # 🔹 Calculate Age
-            age = None
-            if customer.dob:
-                today = date.today()
-                age = today.year - customer.dob.year - (
-                    (today.month, today.day) < (customer.dob.month, customer.dob.day)
-                )
-
-            # 🔹 Eligible Banks
-            eligible_banks = []
-            for bank in Bank.objects.filter(pincode=customer.pincode):
-                for rule in LoanRule.objects.filter(bank=bank):
-                    if (
-                        customer.salary
-                        and float(customer.salary) >= float(rule.min_salary)
-                        and customer.employment_type
-                        and customer.employment_type.lower().strip() == rule.job_type.lower().strip()
-                        and age is not None and rule.min_age <= age <= rule.max_age
-                    ):
-                        eligible_banks.append({
-                            "bank_name": bank.bank_name,
-                            "tenure": rule.tenure,
-                            "min_rate": rule.min_rate,
-                            "max_rate": rule.max_rate,
-                            "min_salary_required": float(rule.min_salary),
-                            "job_type": rule.job_type,
-                            "age_limit": f"{rule.min_age}-{rule.max_age}",
-                            "max_loan_amount": f"Up to ₹{float(customer.salary) * 5:,.0f}"
-                        })
-
-            # 🔹 Build response
-            customer_data = CustomerSerializer(customer).data
-            customer_data["age"] = age
-
+        # Step 2: Calculate Age from DOB
+        age = None
+        if customer.dob:
+            today = date.today()
+            age = today.year - customer.dob.year - (
+                (today.month, today.day) < (customer.dob.month, customer.dob.day)
+            )
+        else:
             return Response({
-                "status": action,  # "created" or "updated"
-                "message": f"Customer {action} successfully",
-                "customer": customer_data,
-                "eligible_banks": eligible_banks
-            }, status=status.HTTP_201_CREATED if action == "created" else status.HTTP_200_OK)
+                "status": "error",
+                "message": "Date of birth is required to calculate age"
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Step 3: Get Company Category
+        company_category = None
+        if company_name:
+            try:
+                company_obj = Company.objects.filter(company_name__iexact=company_name).first()
+                if company_obj:
+                    company_category = company_obj.category
+                else:
+                    # If company not found, assign UNLISTED category
+                    company_category, _ = CompanyCategory.objects.get_or_create(
+                        category_name="UNLISTED"
+                    )
+            except Exception as e:
+                # Default to UNLISTED if any error
+                company_category, _ = CompanyCategory.objects.get_or_create(
+                    category_name="UNLISTED"
+                )
+        else:
+            # No company name provided, use UNLISTED
+            company_category, _ = CompanyCategory.objects.get_or_create(
+                category_name="UNLISTED"
+            )
+
+        # Step 4: Check Eligibility for Each Bank
+        eligible_banks = []
+        ineligibility_reasons = []
+
+        for bank in Bank.objects.all():
+            # Check 1: Bank Coverage by Pincode
+            bank_pins = bank.get_pincode_list()
+            if applicant_pincode not in bank_pins:
+                ineligibility_reasons.append({
+                    "bank_name": bank.bank_name,
+                    "reason": "Bank not available in your area (pincode not served)"
+                })
+                continue
+
+            # Check all products of the bank
+            for product in Product.objects.filter(bank=bank):
+                eligibility_status = {
+                    "is_eligible": True,
+                    "reasons": []
+                }
+
+                # Check 2: Age Eligibility
+                if product.min_age and product.max_age:
+                    if not (product.min_age <= age <= product.max_age):
+                        eligibility_status["is_eligible"] = False
+                        eligibility_status["reasons"].append(
+                            f"Age not in allowed range ({product.min_age}-{product.max_age} years)"
+                        )
+                        ineligibility_reasons.append({
+                            "bank_name": bank.bank_name,
+                            "product": product.product_title,
+                            "reason": f"Age {age} not in range {product.min_age}-{product.max_age}"
+                        })
+                        continue
+
+                # Check 3: Salary Criteria based on Company Category
+                salary_criteria_list = SalaryCriteria.objects.filter(
+                    product=product,
+                    category=company_category
+                )
+                
+                if not salary_criteria_list.exists():
+                    # No salary criteria for this category - skip this product
+                    ineligibility_reasons.append({
+                        "bank_name": bank.bank_name,
+                        "product": product.product_title,
+                        "reason": f"No salary criteria defined for category '{company_category.category_name}'"
+                    })
+                    continue
+                
+                matched_criteria = None
+                salary_ok = False
+                
+                for criteria in salary_criteria_list:
+                    if applicant_salary >= float(criteria.min_salary):
+                        salary_ok = True
+                        matched_criteria = criteria
+                        break
+                
+                if not salary_ok:
+                    min_required = float(salary_criteria_list.first().min_salary)
+                    eligibility_status["is_eligible"] = False
+                    eligibility_status["reasons"].append(
+                        f"Salary ₹{applicant_salary:,.0f} below required ₹{min_required:,.0f} for category '{company_category.category_name}'"
+                    )
+                    ineligibility_reasons.append({
+                        "bank_name": bank.bank_name,
+                        "product": product.product_title,
+                        "reason": f"Salary below minimum ₹{min_required:,.0f} for {company_category.category_name}"
+                    })
+                    continue
+
+                # Check 4: Loan Amount Range (Optional - can be extended)
+                # If applicant requests specific amount, check against product limits
+                # For now, we'll skip this check
+
+                # All checks passed - Add to eligible banks
+                if eligibility_status["is_eligible"]:
+                    eligible_banks.append({
+                        "bank_id": bank.id,
+                        "bank_name": bank.bank_name,
+                        "product_id": product.id,
+                        "product_name": product.product_title,
+                        "eligibility_status": "Eligible",
+                        "company_category": company_category.category_name,
+                        "min_salary_required": float(matched_criteria.min_salary),
+                        "applicant_salary": applicant_salary,
+                        "age_requirement": f"{product.min_age}-{product.max_age} years" if product.min_age and product.max_age else "N/A",
+                        "applicant_age": age,
+                        "tenure_range": f"{product.min_tenure}-{product.max_tenure} months" if product.min_tenure and product.max_tenure else "N/A",
+                        "roi_range": f"{product.min_roi}%-{product.max_roi}%" if product.min_roi and product.max_roi else "N/A",
+                        "loan_amount_range": {
+                            "min": float(product.min_loan_amount) if product.min_loan_amount else 0,
+                            "max": float(product.max_loan_amount) if product.max_loan_amount else applicant_salary * 5
+                        },
+                        "foir_details": product.foir_details or "N/A",
+                        "estimated_max_loan": float(product.max_loan_amount) if product.max_loan_amount else applicant_salary * 5
+                    })
+
+        # Build Final Response
+        customer_data = CustomerSerializer(customer).data
+        customer_data["age"] = age
+        customer_data["company_category"] = company_category.category_name if company_category else "N/A"
+
+        overall_status = "Eligible" if eligible_banks else "Not Eligible"
+        
+        response_data = {
+            "status": action,
+            "message": f"Customer {action} successfully",
+            "eligibility_status": overall_status,
+            "customer": customer_data,
+            "eligible_banks_count": len(eligible_banks),
+            "eligible_banks": eligible_banks
+        }
+        
+        # Optionally include reasons if not eligible
+        if not eligible_banks and ineligibility_reasons:
+            response_data["ineligibility_reasons"] = ineligibility_reasons[:5]  # Show top 5 reasons
+
+        return Response(
+            response_data,
+            status=status.HTTP_201_CREATED if action == "created" else status.HTTP_200_OK
+        )
 
     except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "error",
+            "message": "An error occurred while checking eligibility",
+            "error": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# List all banks OR create new bank
 @api_view(['GET', 'POST'])
 def bank_list_create(request):
     if request.method == 'GET':
@@ -215,86 +358,6 @@ def banks_by_pincodes(request, pincodes):
 
     return Response(response_data)
 
-
-# List, Create, Retrieve, Update, Delete Loan Rules
-@api_view(['GET', 'POST', 'PUT', 'DELETE'])
-def loanrule_list(request, pk=None):
-    # -------------------- GET --------------------
-    if request.method == 'GET':
-        if pk:  # Get single loan rule
-            try:
-                loanrule = LoanRule.objects.get(pk=pk)
-            except LoanRule.DoesNotExist:
-                return Response({"error": "Loan rule not found"}, status=status.HTTP_404_NOT_FOUND)
-            serializer = LoanRuleSerializer(loanrule)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        # Get list of loan rules (optionally filter by bank_id)
-        bank_id = request.GET.get('bank_id')
-        if bank_id:
-            loanrules = LoanRule.objects.filter(bank_id=bank_id)
-        else:
-            loanrules = LoanRule.objects.all()
-        serializer = LoanRuleSerializer(loanrules, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    # -------------------- POST --------------------
-    elif request.method == 'POST':
-        bank_id = request.data.get("bank")
-        job_type = request.data.get("job_type")
-
-        # Check for duplicate rule for the same bank & job type
-        if LoanRule.objects.filter(bank_id=bank_id, job_type__iexact=job_type).exists():
-            return Response(
-                {"error": f"A loan rule already exists for bank ID {bank_id} with job type '{job_type}'"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        serializer = LoanRuleSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    # -------------------- PUT --------------------
-    elif request.method == 'PUT':
-        if not pk:
-            return Response({"error": "Loan rule ID required in URL"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            loanrule = LoanRule.objects.get(pk=pk)
-        except LoanRule.DoesNotExist:
-            return Response({"error": "Loan rule not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = LoanRuleSerializer(loanrule, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    # -------------------- DELETE --------------------
-    elif request.method == 'DELETE':
-        if not pk:
-            return Response({"error": "Loan rule ID required in URL"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            loanrule = LoanRule.objects.get(pk=pk)
-            loanrule.delete()
-            return Response({"message": "Loan rule deleted successfully"}, status=status.HTTP_200_OK)
-        except LoanRule.DoesNotExist:
-            return Response({"error": "Loan rule not found"}, status=status.HTTP_404_NOT_FOUND)
-
-# Get all loan rules for a specific bank
-@api_view(['GET'])
-def loanrules_by_bank(request, bank_id):
-    try:
-        bank = Bank.objects.get(pk=bank_id)
-    except Bank.DoesNotExist:
-        return Response({"error": "Bank not found"}, status=status.HTTP_404_NOT_FOUND)
-    
-    loanrules = LoanRule.objects.filter(bank__id=bank_id)
-    serializer = LoanRuleSerializer(loanrules, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(["GET", "POST"])
