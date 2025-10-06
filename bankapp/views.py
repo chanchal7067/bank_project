@@ -362,8 +362,13 @@ def banks_by_pincodes(request, pincodes):
 
 @api_view(["GET", "POST"])
 def customer_interest_list_create(request):
+    """
+    GET  → List all customer interests
+    POST → Create a new customer interest (with customer, bank, and optional product)
+    """
+
     if request.method == "GET":
-        interests = CustomerInterest.objects.all()
+        interests = CustomerInterest.objects.select_related("customer", "bank", "product").all()
         serializer = CustomerInterestSerializer(interests, many=True)
         return Response(serializer.data)
 
@@ -377,9 +382,14 @@ def customer_interest_list_create(request):
 
 @api_view(["GET"])
 def customer_interests_by_customer(request, customer_id):
-    interests = CustomerInterest.objects.filter(customer_id=customer_id)
+    """
+    GET → Fetch all interests for a specific customer
+    """
+    interests = CustomerInterest.objects.select_related("customer", "bank", "product").filter(customer_id=customer_id)
     serializer = CustomerInterestSerializer(interests, many=True)
     return Response(serializer.data) 
+
+
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
 def product_list(request, pk=None):
     # -------------------- GET --------------------

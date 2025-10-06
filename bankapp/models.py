@@ -45,13 +45,6 @@ class Bank(models.Model):
         return pincode in self.get_pincode_list()
 
 
-class CustomerInterest(models.Model):
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="interests")
-    bank = models.ForeignKey(Bank, on_delete=models.CASCADE, related_name="customer_interests")
-
-    def __str__(self):
-        return f"{self.customer.full_name} - {self.bank.bank_name}"
-
 class Product(models.Model):
     bank = models.ForeignKey(Bank, on_delete=models.CASCADE, related_name="products")
     product_title = models.CharField(max_length=150)
@@ -77,6 +70,17 @@ class Product(models.Model):
 
     def __str__(self):
         return f"{self.bank.bank_name} - {self.product_title}"
+    
+
+class CustomerInterest(models.Model):
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="interests")
+    bank = models.ForeignKey(Bank, on_delete=models.CASCADE, related_name="customer_interests")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="customer_interests", null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.customer.full_name} - {self.bank.bank_name} ({self.product.product_title if self.product else 'No Product'})"
+
+        
 
 # 🔹 New User/Admin model
 class User(models.Model):
