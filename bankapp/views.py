@@ -65,22 +65,25 @@ def update_admin(request, pk):
 @api_view(["POST"])
 def customer_create_or_eligible_banks(request):
     """
-    Customer can check loan eligibility only once per day.
-    If already checked today, prevent re-check and no data update.
+    Check loan eligibility for a customer based on:
+    - Company category and salary criteria
+    - Age limits from product
+    - Bank coverage by pincode
+    Restriction: A customer can check eligibility only once per day.
     """
     try:
         data = request.data
-        
+
         # Step 1: Validate Required Fields
         required_fields = ["full_name", "email", "phone", "dob", "salary", "pincode"]
         missing_fields = [field for field in required_fields if not data.get(field)]
-        
+
         if missing_fields:
             return Response({
                 "status": "error",
                 "message": f"Missing required fields: {', '.join(missing_fields)}"
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         email = data.get("email")
         phone = data.get("phone")
         company_name = data.get("companyName", "").strip()
@@ -90,26 +93,25 @@ def customer_create_or_eligible_banks(request):
         # Step 2: Check if customer already exists
         customer = Customer.objects.filter(email=email).first() or Customer.objects.filter(phone=phone).first()
 
+        # ✅ Restrict eligibility check once per day
         if customer:
-            # ✅ Check if eligibility already checked today
             if customer.last_eligibility_check == date.today():
                 return Response({
                     "status": "restricted",
                     "message": "You have already checked your eligibility today. Please try again tomorrow.",
                     "last_checked_on": customer.last_eligibility_check
                 }, status=status.HTTP_403_FORBIDDEN)
-            
-            # ❌ Remove update logic — do not modify existing customer
-            return Response({
-                "status": "restricted",
-                "message": "Your data already exists and cannot be updated today. Try again tomorrow."
-            }, status=status.HTTP_403_FORBIDDEN)
-        
-        # Step 3: Create new customer
+            else:
+                # Do not update existing customer details — just restrict modification
+                return Response({
+                    "status": "restricted",
+                    "message": "Your data already exists and cannot be updated today. Try again tomorrow."
+                }, status=status.HTTP_403_FORBIDDEN)
+
+        # Step 3: Create a new customer
         serializer = CustomerSerializer(data=data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
         customer = serializer.save()
 
         # Calculate Annual Income
@@ -132,62 +134,113 @@ def customer_create_or_eligible_banks(request):
         # Step 5: Determine Company Category
         company_category = None
         if company_name:
-            company_obj = Company.objects.filter(company_name__iexact=company_name).first()
-            if company_obj:
-                company_category = company_obj.category
-            else:
+            try:
+                company_obj = Company.objects.filter(company_name__iexact=company_name).first()
+                if company_obj:
+                    company_category = company_obj.category
+                else:
+                    company_category, _ = CompanyCategory.objects.get_or_create(category_name="UNLISTED")
+            except Exception:
                 company_category, _ = CompanyCategory.objects.get_or_create(category_name="UNLISTED")
         else:
             company_category, _ = CompanyCategory.objects.get_or_create(category_name="UNLISTED")
 
-        # Step 6: Eligibility Logic (same as before)
+        # Step 6: Check Eligibility
         eligible_banks = []
         ineligibility_reasons = []
 
         for bank in Bank.objects.all():
             bank_pins = bank.get_pincode_list()
             if applicant_pincode not in bank_pins:
+                ineligibility_reasons.append({
+                    "bank_name": bank.bank_name,
+                    "reason": "Bank not available in your area (pincode not served)"
+                })
                 continue
 
             for product in Product.objects.filter(bank=bank):
+                # Check age range
                 if product.min_age and product.max_age:
                     if not (product.min_age <= age <= product.max_age):
+                        ineligibility_reasons.append({
+                            "bank_name": bank.bank_name,
+                            "product": product.product_title,
+                            "reason": f"Age {age} not in range {product.min_age}-{product.max_age}"
+                        })
                         continue
 
-                salary_criteria_list = SalaryCriteria.objects.filter(product=product, category=company_category)
+                salary_criteria_list = SalaryCriteria.objects.filter(
+                    product=product, category=company_category
+                )
                 if not salary_criteria_list.exists():
+                    ineligibility_reasons.append({
+                        "bank_name": bank.bank_name,
+                        "product": product.product_title,
+                        "reason": f"No salary criteria defined for category '{company_category.category_name}'"
+                    })
                     continue
 
-                salary_ok = any(applicant_salary >= float(c.min_salary) for c in salary_criteria_list)
+                matched_criteria = None
+                salary_ok = False
+                for criteria in salary_criteria_list:
+                    if applicant_salary >= float(criteria.min_salary):
+                        salary_ok = True
+                        matched_criteria = criteria
+                        break
+
                 if not salary_ok:
+                    min_required = float(salary_criteria_list.first().min_salary)
+                    ineligibility_reasons.append({
+                        "bank_name": bank.bank_name,
+                        "product": product.product_title,
+                        "reason": f"Salary below minimum ₹{min_required:,.0f} for {company_category.category_name}"
+                    })
                     continue
 
+                # ✅ Eligible bank
                 eligible_banks.append({
+                    "bank_id": bank.id,
                     "bank_name": bank.bank_name,
+                    "product_id": product.id,
                     "product_name": product.product_title,
-                    "min_salary_required": float(salary_criteria_list.first().min_salary),
+                    "eligibility_status": "Eligible",
+                    "company_category": company_category.category_name,
+                    "min_salary_required": float(matched_criteria.min_salary),
                     "applicant_salary": applicant_salary,
-                    "company_category": company_category.category_name
+                    "age_requirement": f"{product.min_age}-{product.max_age} years" if product.min_age and product.max_age else "N/A",
+                    "applicant_age": age,
+                    "tenure_range": f"{product.min_tenure}-{product.max_tenure} months" if product.min_tenure and product.max_tenure else "N/A",
+                    "roi_range": f"{product.min_roi}%-{product.max_roi}%" if product.min_roi and product.max_roi else "N/A",
+                    "loan_amount_range": {
+                        "min": float(product.min_loan_amount) if product.min_loan_amount else 0,
+                        "max": float(product.max_loan_amount) if product.max_loan_amount else applicant_salary * 5
+                    },
+                    "foir_details": product.foir_details or "N/A",
+                    "estimated_max_loan": float(product.max_loan_amount) if product.max_loan_amount else applicant_salary * 5
                 })
 
-        # Step 7: Update last eligibility check
+        # Step 7: Update last eligibility check date
         customer.last_eligibility_check = date.today()
         customer.save()
 
+        # Step 8: Build Final Response
         customer_data = CustomerSerializer(customer).data
         customer_data["age"] = age
-        customer_data["company_category"] = company_category.category_name
+        customer_data["company_category"] = company_category.category_name if company_category else "N/A"
 
         overall_status = "Eligible" if eligible_banks else "Not Eligible"
 
         response_data = {
             "status": "created",
-            "message": "Customer eligibility checked successfully",
+            "message": "Customer created and eligibility checked successfully",
             "eligibility_status": overall_status,
             "customer": customer_data,
-            "eligible_banks": eligible_banks,
-            "eligible_banks_count": len(eligible_banks)
+            "eligible_banks_count": len(eligible_banks),
+            "eligible_banks": eligible_banks
         }
+
+        if not eligible_banks and ineligibility_reasons:
+            response_data["ineligibility_reasons"] = ineligibility_reasons[:5]
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 
@@ -197,8 +250,6 @@ def customer_create_or_eligible_banks(request):
             "message": "An error occurred while checking eligibility",
             "error": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 
 @api_view(['GET', 'POST'])
 def bank_list_create(request):
