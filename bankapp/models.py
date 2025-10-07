@@ -1,6 +1,8 @@
 from django.db import models
 from cloudinary.models import CloudinaryField
 from django.contrib.auth.hashers import make_password, check_password
+from datetime import date
+
 
 
 class Customer(models.Model):
@@ -21,6 +23,9 @@ class Customer(models.Model):
     designation = models.CharField(max_length=100, null=True, blank=True)
 
     company = models.ForeignKey("Company", on_delete=models.SET_NULL, null=True, blank=True, related_name="customers")
+
+    # ✅ New field to restrict one eligibility check per day
+    last_eligibility_check = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return self.full_name
