@@ -12,13 +12,11 @@ urlpatterns = [
     path("banks/<int:pk>/", views.bank_detail, name="bank_detail"),  # GET one, PUT, DELETE
     path("banks/pincode/<str:pincodes>/", views.banks_by_pincodes, name="banks-by-pincode"),
 
-
     path("customer-interests/", views.customer_interest_list_create, name="customer-interest-list-create"),
     path("customer-interests/customer/<int:customer_id>/", views.customer_interests_by_customer, name="customer-interests-by-customer"),
 
     path("products/", views.product_list, name="product-list-create"),
     path("products/<int:pk>/", views.product_list, name="product-detail"),
-
     path("products/bank/<int:bank_id>/", views.get_products_by_bank, name="products-by-bank"),
 
     path('managed-cards/', views.managed_card_list_create, name='managed-card-list-create'),
@@ -34,4 +32,6 @@ urlpatterns = [
     path('salary-criteria/<int:pk>/', views.salary_criteria_detail, name="salary-criteria-detail"),
 
     path ('get-all-eligiblity-checks/', views.get_all_eligibility_checks, name='get-all-eligiblity-checks'),
+
 ]
+

@@ -621,9 +621,6 @@ def salary_criteria_detail(request, pk):
         return Response(status=status.HTTP_200_OK)    
 
 
-
-
-
 @api_view(["GET"])
 def get_all_eligibility_checks(request):
     """
