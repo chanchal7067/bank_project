@@ -339,21 +339,35 @@ def banks_by_pincodes(request, pincodes):
 @api_view(["GET", "POST"])
 def customer_interest_list_create(request):
     """
-    GET  → List all customer interests
+    GET  → List all customer interests with full linked details
     POST → Create a new customer interest (with customer, bank, and optional product)
     """
 
     if request.method == "GET":
+        # Use select_related for performance (fetch related data in one query)
         interests = CustomerInterest.objects.select_related("customer", "bank", "product").all()
         serializer = CustomerInterestSerializer(interests, many=True)
-        return Response(serializer.data)
+        return Response({
+            "status": "success",
+            "message": "All customer interests fetched successfully.",
+            "count": len(serializer.data),
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
 
     elif request.method == "POST":
         serializer = CustomerInterestSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            interest = serializer.save()
+            return Response({
+                "status": "success",
+                "message": "Customer interest created successfully.",
+                "data": CustomerInterestSerializer(interest).data
+            }, status=status.HTTP_201_CREATED)
+        return Response({
+            "status": "error",
+            "message": "Invalid data provided.",
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(["GET"])

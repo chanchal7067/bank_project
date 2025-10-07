@@ -86,7 +86,6 @@ class CustomerInterest(models.Model):
         return f"{self.customer.full_name} - {self.bank.bank_name} ({self.product.product_title if self.product else 'No Product'})"
 
         
-
 # 🔹 New User/Admin model
 class User(models.Model):
     ROLE_CHOICES = (

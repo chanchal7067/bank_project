@@ -97,13 +97,22 @@ class BankSerializer(serializers.ModelSerializer):
         return data
 
 class CustomerInterestSerializer(serializers.ModelSerializer):
-    customer_name = serializers.CharField(source="customer.full_name", read_only=True)
+    customer_details = CustomerSerializer(source="customer", read_only=True)
     bank_name = serializers.CharField(source="bank.bank_name", read_only=True)
     product_title = serializers.CharField(source="product.product_title", read_only=True)
 
     class Meta:
         model = CustomerInterest
-        fields = ["id", "customer", "customer_name", "bank", "bank_name","product","product_title"]      
+        fields = [
+            "id",
+            "customer",          # shows customer ID
+            "customer_details",  # full customer info
+            "bank",
+            "bank_name",
+            "product",
+            "product_title"
+        ]
+
 
 class SalaryCriteriaSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.product_title", read_only=True)
