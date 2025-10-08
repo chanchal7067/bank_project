@@ -110,7 +110,8 @@ class CustomerInterestSerializer(serializers.ModelSerializer):
             "bank",
             "bank_name",
             "product",
-            "product_title"
+            "product_title",
+            "created_at" 
         ]
 
 
@@ -123,17 +124,6 @@ class SalaryCriteriaSerializer(serializers.ModelSerializer):
         fields = ['salary_id', 'product', 'product_name', 'category', 'category_name', 'min_salary']
 
         
-# Product Serializer
-from rest_framework import serializers
-from .models import Product, SalaryCriteria, CompanyCategory
-
-class SalaryCriteriaSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source="category.category_name", read_only=True)
-
-    class Meta:
-        model = SalaryCriteria
-        fields = ['salary_id','product', 'category', 'category_name', 'min_salary']
-
 class ProductSerializer(serializers.ModelSerializer):
     salary_criteria = SalaryCriteriaSerializer(many=True, read_only=True)
 
@@ -241,13 +231,16 @@ class ManagedCardSerializer(serializers.ModelSerializer):
 class CompanyCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyCategory
-        fields = "__all__"    
+        fields = "__all__"
 
     def validate_category_name(self, value):
-        # Case-insensitive uniqueness check
+        # 🔹 Convert underscores to spaces before validation
+        value = value.replace("_", " ").strip()
+
+        # 🔹 Case-insensitive uniqueness check
         qs = CompanyCategory.objects.filter(category_name__iexact=value)
 
-        # Exclude current instance in case of update
+        # Exclude current instance (for update)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
 
@@ -255,6 +248,19 @@ class CompanyCategorySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Category name already exists (case-insensitive).")
 
         return value
+
+    def create(self, validated_data):
+        # 🔹 Ensure underscores are replaced with spaces before saving
+        if "category_name" in validated_data:
+            validated_data["category_name"] = validated_data["category_name"].replace("_", " ").strip()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # 🔹 Ensure underscores are replaced with spaces before updating
+        if "category_name" in validated_data:
+            validated_data["category_name"] = validated_data["category_name"].replace("_", " ").strip()
+        return super().update(instance, validated_data)
+
 
 class CompanySerializer(serializers.ModelSerializer):
     category = CompanyCategorySerializer(read_only=True)   # show category details
