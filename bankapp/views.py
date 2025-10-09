@@ -94,19 +94,19 @@ def customer_create_or_eligible_banks(request):
         customer = Customer.objects.filter(email=email).first() or Customer.objects.filter(phone=phone).first()
 
         # ✅ Restrict eligibility check once per day
-        if customer:
-            if customer.last_eligibility_check == date.today():
-                return Response({
-                    "status": "restricted",
-                    "message": "You have already checked your eligibility today. Please try again tomorrow.",
-                    "last_checked_on": customer.last_eligibility_check
-                }, status=status.HTTP_403_FORBIDDEN)
-            else:
-                # Do not update existing customer details — just restrict modification
-                return Response({
-                    "status": "restricted",
-                    "message": "Your data already exists and cannot be updated today. Try again tomorrow."
-                }, status=status.HTTP_403_FORBIDDEN)
+        # if customer:
+        #     if customer.last_eligibility_check == date.today():
+        #         return Response({
+        #             "status": "restricted",
+        #             "message": "You have already checked your eligibility today. Please try again tomorrow.",
+        #             "last_checked_on": customer.last_eligibility_check
+        #         }, status=status.HTTP_403_FORBIDDEN)
+        #     else:
+        #         # Do not update existing customer details — just restrict modification
+        #         return Response({
+        #             "status": "restricted",
+        #             "message": "Your data already exists and cannot be updated today. Try again tomorrow."
+        #         }, status=status.HTTP_403_FORBIDDEN)
 
         # Step 3: Create a new customer
         serializer = CustomerSerializer(data=data)
