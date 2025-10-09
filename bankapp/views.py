@@ -254,9 +254,15 @@ def customer_create_or_eligible_banks(request):
 @api_view(['GET', 'POST'])
 def bank_list_create(request):
     if request.method == 'GET':
-        banks = Bank.objects.all()
+        # ✅ Fetch all banks in ascending order by bank_name
+        banks = Bank.objects.all().order_by('bank_name')
         serializer = BankSerializer(banks, many=True)
-        return Response(serializer.data)
+        return Response({
+            "status": "success",
+            "message": "Banks fetched successfully in ascending order.",
+            "count": len(serializer.data),
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
         serializer = BankSerializer(data=request.data)
