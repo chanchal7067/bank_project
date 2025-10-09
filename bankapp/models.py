@@ -71,6 +71,8 @@ class Product(models.Model):
     min_roi = models.FloatField(null=True, blank=True)
     max_roi = models.FloatField(null=True, blank=True)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+
     # FOIR (string so it can store formatted descriptions like "40% of salary")
     foir_details = models.CharField(max_length=255, null=True, blank=True)
 

@@ -273,4 +273,41 @@ class CompanySerializer(serializers.ModelSerializer):
         fields = ['company_id', 'company_name', 'category', 'category_id']
 
 
-        
+# Recent customers (eligibility checks)
+class RecentCustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ["id", "full_name", "email", "last_eligibility_check"]
+
+# Recent interests
+class RecentInterestSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source="customer.full_name")
+    product_name = serializers.CharField(source="product.product_title")
+
+    class Meta:
+        model = CustomerInterest
+        fields = ["id", "customer_name", "product_name", "created_at"]
+
+# Recent products
+class RecentProductSerializer(serializers.ModelSerializer):
+    bank_name = serializers.CharField(source="bank.bank_name")
+
+    class Meta:
+        model = Product
+        fields = ["id", "product_title", "bank_name", "created_at"]
+
+# Dashboard serializer
+class DashboardSerializer(serializers.Serializer):
+    totals = serializers.SerializerMethodField()
+    recent_customers = RecentCustomerSerializer(many=True)
+    recent_interests = RecentInterestSerializer(many=True)
+    recent_products = RecentProductSerializer(many=True)
+
+    def get_totals(self, obj):
+        return {
+            "banks": Bank.objects.count(),
+            "personal_loans": Product.objects.count(),
+            "offers": Product.objects.count(),
+            "eligibility_checks": Customer.objects.count(),  # Total users who checked eligibility
+            "interested_users": CustomerInterest.objects.values("customer").distinct().count()
+        }        

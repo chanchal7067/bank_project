@@ -33,5 +33,7 @@ urlpatterns = [
 
     path ('get-all-eligiblity-checks/', views.get_all_eligibility_checks, name='get-all-eligiblity-checks'),
 
+    path('admin-dashboard/', views.admin_dashboard, name='admin-dashboard'),
+
 ]
 

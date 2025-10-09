@@ -5,8 +5,7 @@ from rest_framework import status
 from datetime import date
 from django.utils import timezone
 from .models import Customer, Bank, CustomerInterest ,Product, User, ManagedCard, CompanyCategory, Company, SalaryCriteria
-from .serializers import CustomerSerializer, BankSerializer, CustomerInterestSerializer , AdminLoginSerializer , ProductSerializer , UserSerializer, ManagedCardSerializer , CompanyCategorySerializer, CompanySerializer , SalaryCriteriaSerializer
-
+from .serializers import CustomerSerializer, BankSerializer, CustomerInterestSerializer , AdminLoginSerializer , ProductSerializer , UserSerializer, ManagedCardSerializer , CompanyCategorySerializer, CompanySerializer , SalaryCriteriaSerializer,DashboardSerializer
 # 🔹 Admin Login API
 @api_view(["POST"])
 def admin_login(request):
@@ -715,5 +714,35 @@ def get_all_eligibility_checks(request):
         return Response({
             "status": "error",
             "message": "Error while fetching eligibility data",
+            "error": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+def admin_dashboard(request):
+    try:
+        # Top 5 recent customers who checked eligibility
+        recent_customers = Customer.objects.order_by("-last_eligibility_check")[:5]
+        # Top 5 recent interested users
+        recent_interests = CustomerInterest.objects.order_by("-created_at")[:5]
+        # Top 5 recent products
+        recent_products = Product.objects.order_by("-created_at")[:5]
+
+        dashboard_data = {
+            "recent_customers": recent_customers,
+            "recent_interests": recent_interests,
+            "recent_products": recent_products
+        }
+
+        serializer = DashboardSerializer(dashboard_data)
+        return Response({
+            "status": "success",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            "status": "error",
+            "message": "An error occurred while fetching dashboard data",
             "error": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
