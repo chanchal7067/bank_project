@@ -307,7 +307,7 @@ class DashboardSerializer(serializers.Serializer):
         return {
             "banks": Bank.objects.count(),
             "personal_loans": Product.objects.count(),
-            "offers": Product.objects.count(),
+            "offers": ManagedCard.objects.count(),
             "eligibility_checks": Customer.objects.count(),  # Total users who checked eligibility
             "interested_users": CustomerInterest.objects.values("customer").distinct().count()
         }        

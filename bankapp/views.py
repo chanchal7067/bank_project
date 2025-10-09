@@ -4,6 +4,7 @@ from rest_framework import serializers
 from rest_framework import status
 from datetime import date
 from django.utils import timezone
+from rest_framework.pagination import PageNumberPagination
 from .models import Customer, Bank, CustomerInterest ,Product, User, ManagedCard, CompanyCategory, Company, SalaryCriteria
 from .serializers import CustomerSerializer, BankSerializer, CustomerInterestSerializer , AdminLoginSerializer , ProductSerializer , UserSerializer, ManagedCardSerializer , CompanyCategorySerializer, CompanySerializer , SalaryCriteriaSerializer,DashboardSerializer
 # 🔹 Admin Login API
@@ -337,11 +338,17 @@ def banks_by_pincodes(request, pincodes):
 @api_view(["GET", "POST"])
 def customer_interest_list_create(request):
     """
-    GET  → List all customer interests with full linked details
+    GET  → List all customer interests with pagination and full linked details
     POST → Create a new customer interest (with customer, bank, and optional product)
     """
 
     if request.method == "GET":
+
+        # Pagination settings
+        paginator = PageNumberPagination()
+        paginator.page_size = request.query_params.get('page_size', 10)  # Default page size = 10
+        paginator.page_query_param = 'page'
+        
         # Fetch all interests with related customer, bank, product data
         interests = CustomerInterest.objects.select_related("customer", "bank", "product").all().order_by('-created_at')
         serializer = CustomerInterestSerializer(interests, many=True)
@@ -616,21 +623,28 @@ def get_all_eligibility_checks(request):
     Get all customers who have checked their loan eligibility.
     Includes personal details, salary, company category,
     age, and all eligible banks/products.
+    Paginated using PageNumberPagination.
     """
     try:
-        # ✅ Removed ordering by updated_at
-        customers = Customer.objects.all()
+        # 1️⃣ Get all customers ordered by last eligibility check
+        customers_qs = Customer.objects.all().order_by("-last_eligibility_check")
 
-        if not customers.exists():
+        if not customers_qs.exists():
             return Response({
                 "status": "success",
                 "message": "No customers have checked eligibility yet.",
                 "data": []
             }, status=status.HTTP_200_OK)
 
+        # 2️⃣ Initialize paginator
+        paginator = PageNumberPagination()
+        paginator.page_size = 10  # default records per page, can be overridden with ?page_size=5
+        paginated_customers = paginator.paginate_queryset(customers_qs, request)
+
+        # 3️⃣ Build response data for paginated customers
         response_data = []
 
-        for customer in customers:
+        for customer in paginated_customers:
             # Calculate age
             age = None
             if customer.dob:
@@ -639,7 +653,7 @@ def get_all_eligibility_checks(request):
                     (today.month, today.day) < (customer.dob.month, customer.dob.day)
                 )
 
-            # Get company category
+            # Determine company category
             company_category = None
             company_name = getattr(customer, "companyName", "")
             if company_name:
@@ -651,12 +665,12 @@ def get_all_eligibility_checks(request):
             else:
                 company_category, _ = CompanyCategory.objects.get_or_create(category_name="UNLISTED")
 
-            # Get eligible banks for this customer
+            # Check eligible banks for this customer
             eligible_banks = []
             for bank in Bank.objects.all():
                 bank_pins = bank.get_pincode_list()
                 if customer.pincode not in bank_pins:
-                    continue  # skip if pincode not served
+                    continue
 
                 for product in Product.objects.filter(bank=bank):
                     # Check age range
@@ -664,7 +678,7 @@ def get_all_eligibility_checks(request):
                         if not (product.min_age <= age <= product.max_age):
                             continue
 
-                    # Salary check
+                    # Salary criteria check
                     salary_criteria = SalaryCriteria.objects.filter(
                         product=product, category=company_category
                     )
@@ -673,22 +687,22 @@ def get_all_eligibility_checks(request):
                         continue
 
                     for criteria in salary_criteria:
-                        if float(customer.salary) >= float(criteria.min_salary):
+                        if float(customer.salary or 0) >= float(criteria.min_salary):
                             eligible_banks.append({
                                 "bank_id": bank.id,
                                 "bank_name": bank.bank_name,
                                 "product_id": product.id,
                                 "product_name": product.product_title,
                                 "min_salary_required": float(criteria.min_salary),
-                                "applicant_salary": float(customer.salary),
+                                "applicant_salary": float(customer.salary or 0),
                                 "roi_range": f"{product.min_roi}%-{product.max_roi}%" if product.min_roi and product.max_roi else "N/A",
                                 "tenure_range": f"{product.min_tenure}-{product.max_tenure} months" if product.min_tenure and product.max_tenure else "N/A",
                                 "loan_amount_range": {
                                     "min": float(product.min_loan_amount) if product.min_loan_amount else 0,
-                                    "max": float(product.max_loan_amount) if product.max_loan_amount else float(customer.salary) * 5
+                                    "max": float(product.max_loan_amount) if product.max_loan_amount else float(customer.salary or 0) * 5
                                 }
                             })
-                            break  # only need one valid criteria
+                            break  # Only need first matched criteria
 
             # Build customer data
             customer_data = CustomerSerializer(customer).data
@@ -698,17 +712,13 @@ def get_all_eligibility_checks(request):
                 "eligibility_status": "Eligible" if eligible_banks else "Not Eligible",
                 "eligible_banks_count": len(eligible_banks),
                 "eligible_banks": eligible_banks,
-                "last_eligibility_check": customer.last_eligibility_check  # ✅ added
+                "last_eligibility_check": customer.last_eligibility_check
             })
 
             response_data.append(customer_data)
 
-        return Response({
-            "status": "success",
-            "message": "All customers who checked eligibility",
-            "count": len(response_data),
-            "data": response_data
-        }, status=status.HTTP_200_OK)
+        # 4️⃣ Return paginated response
+        return paginator.get_paginated_response(response_data)
 
     except Exception as e:
         return Response({
